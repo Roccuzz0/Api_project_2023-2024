@@ -6,23 +6,33 @@ typedef struct HeapNode {//nodo del minheap che contiene i due valori scadenza p
     int weight; //peso
 } HeapNode;
 
-typedef struct MinHeap {//definizione del min heap(struttura degli ingredienti) con capacità e dimensione dinamiche da aggironare nel codice
+typedef struct Ingrediente {//definizione del min heap(struttura degli ingredienti) con capacità e dimensione dinamiche da aggironare nel codice
     HeapNode *nodes;
     int capacity;
     int size;
 } Ingrediente;
 
-typedef struct HashNode {//struttura del nodo di hash con il puntatore alla chiave il peso complessivo del prodotto e il puntatore al minheap
-    char *key;
-    int total_weight;
-    Ingrediente *min_heap;
-    struct HashNode *next;
-} Ricetta;
+typedef struct Magazzino {//struttura del nodo di hash con il puntatore alla chiave il peso complessivo del prodotto e il puntatore al minheap
+    char *key;//nome ingrediente
+    int total_weight;//quantità totale in dell'ingrediente
+    Ingrediente min_heap;//riferimento ad albero per pescare quelle con il T minore
+    struct HashNode *next;// riferimento al nodo successivo
+} Magazzino;
 
 typedef struct HashTable {// struttura della tabella di hash, **cells crea le celle, size numero di celle nella tabella
-    Ricetta **cells;
+    Magazzino **cells;
     int size;
-} Dizionario_Ricette;
+} Dizionario_Ingredienti;
+
+typedef struct Ricetta{//lista per salvare i valori delle ricette(ingrediente e peso)
+    char *ingrediente; //nome ingrediente
+    int peso; //peso necessario
+    struct Ricetta *next;//riferimento al nodo successivo della lista puntata
+}Ricetta;
+typedef struct Dizionario_ricette{
+    Ricetta **cells;// celle delle ricette
+    int dimension;//dimensione dell'hash table, dobbiamo renderla varianile
+}Dizionario_ricette;
 
 int main(){
 
