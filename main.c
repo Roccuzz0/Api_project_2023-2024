@@ -1,6 +1,32 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <malloc.h>
+typedef struct HeapNode {//nodo del minheap che contiene i due valori scadenza peso
+    int expiry; //scadenza
+    int weight; //peso
+} HeapNode;
+
+typedef struct MinHeap {//definizione del min heap(struttura degli ingredienti) con capacità e dimensione dinamiche da aggironare nel codice
+    HeapNode *nodes;
+    int capacity;
+    int size;
+} Ingrediente;
+
+typedef struct HashNode {//struttura del nodo di hash con il puntatore alla chiave il peso complessivo del prodotto e il puntatore al minheap
+    char *key;
+    int total_weight;
+    Ingrediente *min_heap;
+    struct HashNode *next;
+} Ricetta;
+
+typedef struct HashTable {// struttura della tabella di hash, **cells crea le celle, size numero di celle nella tabella
+    Ricetta **cells;
+    int size;
+} Dizionario_Ricette;
+
 int main(){
-    printf("Hello World!");
+
+
     return 0;
 }
 
@@ -12,6 +38,8 @@ int main(){
  chiama le rispettive funzioni, possiamo fare un semplice IF tanto si dovrebbe capire velocemente, se no un switch case.
  1)Per le ricette optiamo per un hashmap che le contiene tutte, quindi ci basta trovare un modo efficiente
     per creare la tabella di hash e anche una soluzione per eliminare senza problemi.
+    Possimo salvarci subito il peso della ricetta, ovvero la somma di tutti gli ingredienti, in modo tale che, quando la andiamo
+    a caricare sul camioncino, sappiamo subito il suo peso e non dobbiamo calcolaro.(peso dato dalla somma degli ingredienti)
  2)Potremmo non creare una funzione per questo ma salvare semplicemente in una variabile il numero di T, che corrisponde a
     ogni quanto passa il camioncino, poi ad ogni ciclo verificare se siamo nel caso %T==0 ovvero il tempo di passaggio e
     chiamare una funzione per svolgere correttamente il caricamento.
