@@ -6,6 +6,7 @@
 
 #define MAX_NAME 255
 #define TABLE_SIZE 50
+#define DELETED_NODE (Ricetta*)(0xFFFFFFFFFFFFFFFUL)
 
 typedef struct HeapNode {
     int expiry; //scadenza
@@ -63,7 +64,9 @@ void print_table() {
     for (int i = 0; i < TABLE_SIZE; ++i) {
         if (hash_table[i] == NULL) {
             printf("\t%i\t---\n", i);
-        } else {
+        } else if(hash_table[i]==DELETED_NODE) {
+            printf("\t%i\t---<deleted>\n", i);
+        }else{
             printf("\t%i\t%s\n", i, hash_table[i]->ingrediente);
         }
     }
@@ -71,14 +74,49 @@ void print_table() {
 }
 
 bool hash_insert(Ricetta *p) {
-    if (p == NULL)
-        return false;
+    if (p == NULL) return false;
     int index = hash(p->ingrediente);
+    for (int i = 0; i < TABLE_SIZE; ++i) {
+        int try = (i + index) % TABLE_SIZE;
+        if(hash_table[try]==NULL){
+           hash_table[try]  = DELETED_NODE;
+           hash_table[try] = p;
+           return true;
+        }
+    }
     if (hash_table[index] != NULL) {
         return false; // Cell is already occupied
     }
-    hash_table[index] = p;
-    return true;
+    return false;
+}
+//trovare una ricetta nella tabella
+Ricetta *hash_lookup (char *nome){
+    int index = hash(nome);
+    for (int i = 0; i < TABLE_SIZE; ++i) {
+        int try = (i + index) % TABLE_SIZE;
+        if(hash_table[try]==NULL){
+            return false; // not here
+        }
+        if(hash_table[try]==DELETED_NODE) continue;
+        if (strncmp(hash_table[index]->ingrediente,nome,TABLE_SIZE)==0){
+            return hash_table[try];
+        }
+    }
+    return NULL;
+}
+Ricetta *hash_delete(char *nome){//cancello un elemento e ritorno l'elemento cancellato
+    int index = hash(nome);
+    for (int i = 0; i < TABLE_SIZE; ++i) {
+        int try = (i + index) % TABLE_SIZE;
+        if (hash_table[try]==NULL) return NULL;
+        if (hash_table[try]==DELETED_NODE) continue;
+        if (strncmp(hash_table[index]->ingrediente,nome,TABLE_SIZE)==0){
+            Ricetta *tmp = hash_table[try];
+            hash_table[try] = DELETED_NODE;
+            return tmp;
+        }
+    }
+    return NULL;
 }
 
 int main() {
@@ -90,8 +128,19 @@ int main() {
     print_table(); // stampa tabella vuota
 
     Ricetta torta = {.ingrediente = "farina", .peso = 100};
+    Ricetta panna = {.ingrediente = "zucchero", .peso = 20};
     hash_insert(&torta);
+    hash_insert(&panna);
     print_table();
+    Ricetta *tmp = hash_lookup("farina");
+    if(tmp==NULL){
+        printf("non nella tabella\n");
+    }else{
+        printf("\nnella tabella  %s\n",tmp->ingrediente);
+    }
+    hash_delete("farina");
+    print_table();
+
 
     /*printf("torta ==> %u\n", hash("torta"));
     printf("pane ==> %u\n", hash("pane"));
