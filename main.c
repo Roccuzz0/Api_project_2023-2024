@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define MAX_NAME 255
+#define MAX_NAME 256
 #define TABLE_SIZE 50
 #define DELETED_NODE (Ricetta*)(0xFFFFFFFFFFFFFFFUL)
 
@@ -13,35 +13,41 @@ typedef struct HeapNode {
     int weight; //peso
 } HeapNode;
 
-typedef struct Ingrediente {
+typedef struct IngredienteMinHeap {
     HeapNode *nodes;
     int size;
-} Ingrediente;
+    int capacity;
+} IngredienteMinHeap;
 
-typedef struct HashNode {
+typedef struct IngredienteHashNode {
     char *key; //nome ingrediente
     int total_weight; //quantità totale in dell'ingrediente
-    Ingrediente min_heap; //riferimento ad albero per pescare quelle con il T minore
+    IngredienteMinHeap min_heap; //riferimento ad albero per pescare quelle con il T minore
     struct HashNode *next; // riferimento al nodo successivo
-} Magazzino;
+} IngredienteHashNode;
 
-typedef struct HashTable {
-    Magazzino **cells; // crea le celle
+typedef struct MagazzinoHashTable {
+    IngredienteHashNode **cells; // crea le celle
     int size; // numero di celle nella tabella
-} Dizionario_Ingredienti;
+} MagazzinoHashTable;
+
+typedef struct Ingrediente {
+    char *nome;
+    int peso; //peso necessario
+    struct Ingrediente* next;
+} Ingrediente;
 
 typedef struct Ricetta {
-    char *ingrediente; //nome ingrediente
-    int peso; //peso necessario
-    struct Ricetta *next; //riferimento al nodo successivo della lista puntata
+    char *nome; //nome ricetta
+    Ingrediente *ingredienti; //riferimento al nodo successivo della lista puntata
 } Ricetta;
 
-typedef struct Dizionario_ricette {
-    Ricetta **cells; // celle delle ricette
-    int dimension; //dimensione dell'hash table, dobbiamo renderla variabile
-} Dizionario_ricette;
+// typedef struct RicetteHashTable {
+//     Ricetta **cells; // celle delle ricette
+//     int dimension; //dimensione dell'hash table, dobbiamo renderla variabile
+// } RicetteHashTable;
 
-Ricetta *hash_table[TABLE_SIZE];
+Ricetta *ricette_hash_table[TABLE_SIZE];
 
 unsigned int hash(char *ricetta) {
     int length = strnlen(ricetta, MAX_NAME);
@@ -55,69 +61,74 @@ unsigned int hash(char *ricetta) {
 
 void init_hash() {
     for (int i = 0; i < TABLE_SIZE; ++i) {
-        hash_table[i] = NULL; //table is empty
+        ricette_hash_table[i] = NULL; //table is empty
     }
 }
 
 void print_table() {
     printf("Start\n");
     for (int i = 0; i < TABLE_SIZE; ++i) {
-        if (hash_table[i] == NULL) {
+        if (ricette_hash_table[i] == NULL) {
             printf("\t%i\t---\n", i);
-        } else if(hash_table[i]==DELETED_NODE) {
+        } else if(ricette_hash_table[i]==DELETED_NODE) {
             printf("\t%i\t---<deleted>\n", i);
-        }else{
-            printf("\t%i\t%s\n", i, hash_table[i]->ingrediente);
+        } else {
+            printf("\t%i\t%s\n", i, ricette_hash_table[i]->nome);
         }
     }
     printf("end\n");
 }
 
-bool hash_insert(Ricetta *p) {
-    if (p == NULL) return false;
-    int index = hash(p->ingrediente);
-    for (int i = 0; i < TABLE_SIZE; ++i) {
+bool aggiungi_ricetta(Ricetta *r) {
+    if (r == NULL) return false;
+    int index = hash(r->nome);
+    for (int i = 0; i < TABLE_SIZE; i++) {
         int try = (i + index) % TABLE_SIZE;
-        if(hash_table[try]==NULL){
-           hash_table[try]  = DELETED_NODE;
-           hash_table[try] = p;
+        if(ricette_hash_table[try]==NULL){
+           ricette_hash_table[try] = DELETED_NODE;
+           ricette_hash_table[try] = r;
            return true;
         }
     }
-    if (hash_table[index] != NULL) {
+    if (ricette_hash_table[index] != NULL) {
         return false; // Cell is already occupied
     }
     return false;
 }
+
 //trovare una ricetta nella tabella
-Ricetta *hash_lookup (char *nome){
+Ricetta *cerca_ricetta(char *nome){
     int index = hash(nome);
-    for (int i = 0; i < TABLE_SIZE; ++i) {
+    for (int i = 0; i < TABLE_SIZE; i++) {
         int try = (i + index) % TABLE_SIZE;
-        if(hash_table[try]==NULL){
+        if(ricette_hash_table[try]==NULL){
             return false; // not here
         }
-        if(hash_table[try]==DELETED_NODE) continue;
-        if (strncmp(hash_table[index]->ingrediente,nome,TABLE_SIZE)==0){
-            return hash_table[try];
+        if(ricette_hash_table[try]==DELETED_NODE) continue;
+        if (strncmp(ricette_hash_table[index]->nome, nome, TABLE_SIZE)==0){
+            return ricette_hash_table[try];
         }
     }
     return NULL;
 }
-Ricetta *hash_delete(char *nome){//cancello un elemento e ritorno l'elemento cancellato
+Ricetta *elimina_ricetta(char *nome){//cancello un elemento e ritorno l'elemento cancellato
     int index = hash(nome);
     for (int i = 0; i < TABLE_SIZE; ++i) {
         int try = (i + index) % TABLE_SIZE;
-        if (hash_table[try]==NULL) return NULL;
-        if (hash_table[try]==DELETED_NODE) continue;
-        if (strncmp(hash_table[index]->ingrediente,nome,TABLE_SIZE)==0){
-            Ricetta *tmp = hash_table[try];
-            hash_table[try] = DELETED_NODE;
+        if (ricette_hash_table[try]==NULL) return NULL;
+        if (ricette_hash_table[try]==DELETED_NODE) continue;
+        if (strncmp(ricette_hash_table[index]->nome, nome, TABLE_SIZE)==0){
+            Ricetta *tmp = ricette_hash_table[try];
+            ricette_hash_table[try] = DELETED_NODE;
             return tmp;
         }
     }
     return NULL;
 }
+
+Ricetta* crea_ricetta(char*);
+
+Ingrediente* inserisci_ingrediente(Ingrediente*, char*, int);
 
 int main() {
     /*insert delete (hash, tree) main in letture, con il do while
@@ -127,19 +138,37 @@ int main() {
     init_hash();
     print_table(); // stampa tabella vuota
 
-    Ricetta torta = {.ingrediente = "farina", .peso = 100};
-    Ricetta panna = {.ingrediente = "zucchero", .peso = 20};
-    hash_insert(&torta);
-    hash_insert(&panna);
-    print_table();
-    Ricetta *tmp = hash_lookup("farina");
-    if(tmp==NULL){
-        printf("non nella tabella\n");
-    }else{
-        printf("\nnella tabella  %s\n",tmp->ingrediente);
+    //Simula inerimento di una ricetta
+    char aggiungi_ricetta_test[] = "torta farina 100 cioccolato 50 uova 20";
+    char nome_ricetta[10];
+    int i = 0;
+    while(aggiungi_ricetta_test[i] != ' '){
+        nome_ricetta[i] = aggiungi_ricetta_test[i];
+        i++;
     }
-    hash_delete("farina");
+    nome_ricetta[i] = '\0';
+    if(cerca_ricetta(nome_ricetta) == NULL){
+        Ricetta* nuova_ricetta = crea_ricetta(aggiungi_ricetta_test);
+        aggiungi_ricetta(nuova_ricetta);
+    }
+
     print_table();
+
+    printf("%s %d", cerca_ricetta(nome_ricetta)->ingredienti->nome, cerca_ricetta(nome_ricetta)->ingredienti->peso);
+
+    // Ricetta torta = {.nome = "farina"};
+    // Ricetta panna = {.nome = "zucchero"};
+    // hash_insert(&torta);
+    // hash_insert(&panna);
+    // print_table();
+    // Ricetta *tmp = hash_lookup("farina");
+    // if(tmp==NULL){
+    //     printf("non nella tabella\n");
+    // }else{
+    //     printf("\nnella tabella  %s\n",tmp->nome);
+    // }
+    // hash_delete("farina");
+    // print_table();
 
 
     /*printf("torta ==> %u\n", hash("torta"));
@@ -181,3 +210,55 @@ int main() {
  per le stampe devo ancora vedere bene ma credo basti scrivere tutti gli ordini che riesce a stampare, le ricette quando vengono aggiunte
  e rimosse e poi non saprei.
  */
+
+Ingrediente* crea_ingrediente(){
+    Ingrediente* temp;
+    temp = (Ingrediente*)malloc(sizeof(Ingrediente));
+    temp->next = NULL;
+    return temp;
+}
+
+Ingrediente* inserisci_ingrediente(Ingrediente* head, char* nome, int peso){
+    Ingrediente* temp;
+    Ingrediente* p;
+    temp = crea_ingrediente();
+    temp->nome = nome;
+    temp->peso = peso;
+    if(head == NULL){
+        head = temp;
+    }else{
+        p = head;
+        while(p->next != NULL){
+            p = p->next; //TODO: inserendo il nodo all'inizio, si risparmierebbe in termini di tempo
+        }
+        p->next = temp;
+    }
+    return head;
+}
+
+Ricetta *crea_ricetta(char *s){
+    Ricetta *nuova_ricetta = (Ricetta*)malloc(sizeof(Ricetta));
+    char* token = strtok(s, " ");
+    nuova_ricetta->nome = token;
+
+    //primo ingrediente
+    Ingrediente *head = NULL;
+    token = strtok(NULL, " ");
+    char* nome_ingrediente = token;
+    token = strtok(NULL, " ");
+    int peso = atoi(token);
+    head = inserisci_ingrediente(head, nome_ingrediente, peso);
+    nuova_ricetta->ingredienti = head;
+    token = strtok(NULL, " ");
+
+    //itero fino a fine ingredienti
+    while(token != NULL){
+        nome_ingrediente = token;
+        token = strtok(NULL, " ");
+        peso = atoi(token);
+        head = inserisci_ingrediente(head, nome_ingrediente, peso);
+        token = strtok(NULL, " ");
+    }
+
+    return nuova_ricetta;
+}
