@@ -1,48 +1,110 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <malloc.h>
-typedef struct HeapNode {//nodo del minheap che contiene i due valori scadenza peso
+#include <string.h>
+#include <stdbool.h>
+
+#define MAX_NAME 255
+#define TABLE_SIZE 50
+
+typedef struct HeapNode {
     int expiry; //scadenza
     int weight; //peso
 } HeapNode;
 
-typedef struct Ingrediente {//definizione del min heap(struttura degli ingredienti) con capacità e dimensione dinamiche da aggironare nel codice
+typedef struct Ingrediente {
     HeapNode *nodes;
-    int capacity;
     int size;
 } Ingrediente;
 
-typedef struct Magazzino {//struttura del nodo di hash con il puntatore alla chiave il peso complessivo del prodotto e il puntatore al minheap
-    char *key;//nome ingrediente
-    int total_weight;//quantità totale in dell'ingrediente
-    Ingrediente min_heap;//riferimento ad albero per pescare quelle con il T minore
-    struct HashNode *next;// riferimento al nodo successivo
+typedef struct HashNode {
+    char *key; //nome ingrediente
+    int total_weight; //quantità totale in dell'ingrediente
+    Ingrediente min_heap; //riferimento ad albero per pescare quelle con il T minore
+    struct HashNode *next; // riferimento al nodo successivo
 } Magazzino;
 
-typedef struct HashTable {// struttura della tabella di hash, **cells crea le celle, size numero di celle nella tabella
-    Magazzino **cells;
-    int size;
+typedef struct HashTable {
+    Magazzino **cells; // crea le celle
+    int size; // numero di celle nella tabella
 } Dizionario_Ingredienti;
 
-typedef struct Ricetta{//lista per salvare i valori delle ricette(ingrediente e peso)
+typedef struct Ricetta {
     char *ingrediente; //nome ingrediente
     int peso; //peso necessario
-    struct Ricetta *next;//riferimento al nodo successivo della lista puntata
-}Ricetta;
-typedef struct Dizionario_ricette{
-    Ricetta **cells;// celle delle ricette
-    int dimension;//dimensione dell'hash table, dobbiamo renderla varianile
-}Dizionario_ricette;
+    struct Ricetta *next; //riferimento al nodo successivo della lista puntata
+} Ricetta;
 
-int main(){
+typedef struct Dizionario_ricette {
+    Ricetta **cells; // celle delle ricette
+    int dimension; //dimensione dell'hash table, dobbiamo renderla variabile
+} Dizionario_ricette;
 
+Ricetta *hash_table[TABLE_SIZE];
+
+unsigned int hash(char *ricetta) {
+    int length = strnlen(ricetta, MAX_NAME);
+    unsigned int hash_value = 0;
+    for (int i = 0; i < length; ++i) {
+        hash_value += ricetta[i];
+        hash_value = (hash_value * ricetta[i]) % TABLE_SIZE;
+    }
+    return hash_value;
+}
+
+void init_hash() {
+    for (int i = 0; i < TABLE_SIZE; ++i) {
+        hash_table[i] = NULL; //table is empty
+    }
+}
+
+void print_table() {
+    printf("Start\n");
+    for (int i = 0; i < TABLE_SIZE; ++i) {
+        if (hash_table[i] == NULL) {
+            printf("\t%i\t---\n", i);
+        } else {
+            printf("\t%i\t%s\n", i, hash_table[i]->ingrediente);
+        }
+    }
+    printf("end\n");
+}
+
+bool hash_insert(Ricetta *p) {
+    if (p == NULL)
+        return false;
+    int index = hash(p->ingrediente);
+    if (hash_table[index] != NULL) {
+        return false; // Cell is already occupied
+    }
+    hash_table[index] = p;
+    return true;
+}
+
+int main() {
+    /*insert delete (hash, tree) main in letture, con il do while
+ */
+/* Mancano coda ordini da fare, coda ordini emessi
+ */
+    init_hash();
+    print_table(); // stampa tabella vuota
+
+    Ricetta torta = {.ingrediente = "farina", .peso = 100};
+    hash_insert(&torta);
+    print_table();
+
+    /*printf("torta ==> %u\n", hash("torta"));
+    printf("pane ==> %u\n", hash("pane"));
+    printf("sfoglia ==> %u\n", hash("sfoglia"));
+    printf("caramella ==> %u\n", hash("caramella"));
+    printf("sorbetto ==> %u\n", hash("sorbetto"));
+    printf("biscotto ==> %u\n", hash("biscotto"));*/
 
     return 0;
 }
-
 /*
  Nel main leggiamo la prima stringa e poi possiamo utilizzare una funzione che anazlizza la stringa letta e a seconda che sia:
- 1)una ricetta da aggiungere/rimuovere;
+ 1)una ricetta da aggiungere/rimuovere/visualizza ingredienti;
  2)il tempo del camioncino, ovvero ogni quanti t passa;
  3)un elemento da aggiungere;
  chiama le rispettive funzioni, possiamo fare un semplice IF tanto si dovrebbe capire velocemente, se no un switch case.
