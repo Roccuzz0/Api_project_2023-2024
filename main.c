@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #define MAX_NAME 256
+#define MIN_HEAP_CAPACITY 10
 #define TABLE_SIZE 50
 #define DELETED_NODE (Ricetta*)(0xFFFFFFFFFFFFFFFUL)
 
@@ -58,13 +59,143 @@ unsigned int hash(char *ricetta) {
     }
     return hash_value;
 }
+// funzione per swappare i nodi
+void swap_node(HeapNode* a, HeapNode* b) {
+    HeapNode temp = *a;
+    *a = *b;
+    *b = temp;
+}
 
+//ordinamento del min heap
+void min_heapify(IngredienteMinHeap* min_heap, int index) {
+    int smallest = index;
+    int left = 2 * index + 1;
+    int right = 2 * index + 2;
+
+    // controllo se i figli sono dentro i limiti dell'heap
+    if (left < min_heap->size && min_heap->nodes[left].expiry < min_heap->nodes[smallest].expiry) {
+        smallest = left;
+    }
+
+    if (right < min_heap->size && min_heap->nodes[right].expiry < min_heap->nodes[smallest].expiry) {
+        smallest = right;
+    }
+
+    // se il nodo più piccolo non è l'indice corrente, swap e continua a fare heapify
+    if (smallest != index) {
+        swap_node(&min_heap->nodes[smallest], &min_heap->nodes[index]);
+        min_heapify(min_heap, smallest);
+    }
+}
+
+//funzione di inserimento del min heap
+void insert_min_heap(IngredienteMinHeap* min_heap, HeapNode node) {
+    // Controlla se l'heap è pieno e, in tal caso, raddoppia la capacità
+    if (min_heap->size == min_heap->capacity) {
+        min_heap->capacity *= 2;
+        min_heap->nodes = (HeapNode*)realloc(min_heap->nodes, min_heap->capacity * sizeof(HeapNode));
+    }
+    HeapNode* new_nodes = (HeapNode*)realloc(min_heap->nodes, min_heap->capacity * sizeof(HeapNode));
+    if (new_nodes == NULL) {
+        // Gestisci l'errore di allocazione
+        perror("Errore di allocazione memoria");
+        exit(EXIT_FAILURE);
+    }
+    min_heap->nodes = new_nodes;
+
+    int index = min_heap->size++;// Aggiungi il nuovo nodo alla fine dell'heap
+    min_heap->nodes[index] = node;
+    //riordina
+    while (index != 0 && min_heap->nodes[(index - 1) / 2].expiry > min_heap->nodes[index].expiry) {
+        swap_node(&min_heap->nodes[index], &min_heap->nodes[(index - 1) / 2]);
+        index = (index - 1) / 2;
+    }
+}
+
+void rifornimento(MagazzinoHashTable* magazzino, char* nome_ingrediente, int quantita, int scadenza) {
+    int index = hash(nome_ingrediente);
+    IngredienteHashNode* ingrediente_node = magazzino->cells[index];
+    //gestione delle collisioni valida, non credo che abbiamo collisioni noi, le gestivame nell'insert
+//    while (ingrediente_node != NULL && strcmp(ingrediente_node->key, nome_ingrediente) != 0) {
+//        ingrediente_node = ingrediente_node->next;
+//    }
+    //se non esiste il nodo lo crea e setta tutto a zero
+    if (ingrediente_node == NULL) {
+        // creazione del nuovo nodo se l'ingediente non è trovato
+        ingrediente_node = (IngredienteHashNode*)malloc(sizeof(IngredienteHashNode));
+        ingrediente_node->key = strdup(nome_ingrediente);
+        ingrediente_node->total_weight = 0;
+        ingrediente_node->min_heap.size = 0;
+        ingrediente_node->min_heap.capacity = MIN_HEAP_CAPACITY; // Capacità iniziale
+        ingrediente_node->min_heap.nodes = (HeapNode*)malloc(ingrediente_node->min_heap.capacity * sizeof(HeapNode));
+        ingrediente_node->next = magazzino->cells[index];
+        magazzino->cells[index] = ingrediente_node;
+    }
+    // aggiorna il peso totale
+    ingrediente_node->total_weight += quantita;
+    // inserisci il nuovo nodo nel min heap
+    HeapNode new_node = { .expiry = scadenza, .weight = quantita };
+    insert_min_heap(&ingrediente_node->min_heap, new_node);
+}
+
+// funzione per rimuovere elementi scaduti dal min-heap
+void remove_expired_from_heap(IngredienteMinHeap* min_heap, int current_time) {
+    int i = 0;
+    while (i < min_heap->size) {
+        if (min_heap->nodes[i].expiry < current_time) {
+            // rimuovi il nodo scaduto, sostituendolo con l'ultimo nodo e riduci la dimensione
+            min_heap->nodes[i] = min_heap->nodes[min_heap->size - 1];
+            min_heap->size--;
+            // riordina il min-heap
+            min_heapify(min_heap, i);
+        } else {
+            i++;
+        }
+    }
+}
+
+// funzione per rimuovere un ingrediente dalla tabella hash e dal min-heap
+void rimuovi_ingredient(MagazzinoHashTable* magazzino, char* nome_ingrediente, int current_time) {
+    int index = hash(nome_ingrediente);
+    IngredienteHashNode* ingrediente_node = magazzino->cells[index];
+    IngredienteHashNode* prev_node = NULL;
+    // trova il nodo con il nome dell'ingrediente
+    while (ingrediente_node != NULL && strcmp(ingrediente_node->key, nome_ingrediente) != 0) {
+        prev_node = ingrediente_node;
+        ingrediente_node = ingrediente_node->next;
+    }
+    // Rimuovi elementi scaduti dal min-heap
+    remove_expired_from_heap(&ingrediente_node->min_heap, current_time);
+    // Calcola il peso totale rimanente
+    int remaining_weight = 0;
+    for (int i = 0; i < ingrediente_node->min_heap.size; i++) {
+        remaining_weight += ingrediente_node->min_heap.nodes[i].weight;
+    }
+    // Aggiorna il peso totale
+    ingrediente_node->total_weight = remaining_weight;
+    // Se il peso totale è zero, elimina il nodo dalla tabella hash
+    if (ingrediente_node->total_weight == 0) {
+        if (prev_node == NULL) {
+            // Nodo da rimuovere è il primo nella lista
+            magazzino->cells[index] = ingrediente_node->next;
+        } else {
+            // Nodo da rimuovere non è il primo nella lista
+            prev_node->next = ingrediente_node->next;
+        }
+        // Libera la memoria
+        free(ingrediente_node->key);
+        free(ingrediente_node->min_heap.nodes);
+        free(ingrediente_node);
+    }
+}
+
+//creo la tabella di hash
 void init_hash() {
     for (int i = 0; i < TABLE_SIZE; ++i) {
         ricette_hash_table[i] = NULL; //table is empty
     }
 }
-
+//stampo la hash
 void print_table() {
     printf("Start\n");
     for (int i = 0; i < TABLE_SIZE; ++i) {
@@ -78,7 +209,7 @@ void print_table() {
     }
     printf("end\n");
 }
-
+//aggiungo la ricetta nella hash
 bool aggiungi_ricetta(Ricetta *r) {
     if (r == NULL) return false;
     int index = hash(r->nome);
@@ -125,6 +256,36 @@ Ricetta *elimina_ricetta(char *nome){//cancello un elemento e ritorno l'elemento
     }
     return NULL;
 }
+//altro modo per rimuovere la ricetta deallocando spazio, forse leggermente meglio, bisogna stampare correttamente ancora mi sa
+//void rimuovi_ricetta(char *nome) {
+//    int index = hash(nome);
+//    for (int i = 0; i < TABLE_SIZE; i++) {
+//        int try = (i + index) % TABLE_SIZE;
+//        if (ricette_hash_table[try] == NULL) {
+//            // La cella è vuota, quindi non c'è nulla da rimuovere
+//            return;
+//        }
+//        if (ricette_hash_table[try] == DELETED_NODE) {
+//            // La cella è marcata come eliminata, continua a cercare
+//            continue;
+//        }
+//        if (strcmp(ricette_hash_table[try]->nome, nome) == 0) {
+//            // Trova la ricetta da rimuovere
+//            Ricetta *ricetta_da_rimuovere = ricette_hash_table[try];
+//
+//            // Rimuove la ricetta dalla tabella hash
+//            ricette_hash_table[try] = DELETED_NODE;
+//
+//            // Libera la memoria associata alla ricetta
+//            free_ingredienti(ricetta_da_rimuovere->ingredienti);
+//            free(ricetta_da_rimuovere->nome);
+//            free(ricetta_da_rimuovere);
+//
+//            return;
+//        }
+//    }
+//}
+
 
 Ricetta* crea_ricetta(char*);
 
@@ -154,31 +315,46 @@ int main() {
 
     print_table();
 
-    printf("%s %d", cerca_ricetta(nome_ricetta)->ingredienti->nome, cerca_ricetta(nome_ricetta)->ingredienti->peso);
+    printf("%s %d\n", cerca_ricetta(nome_ricetta)->ingredienti->nome, cerca_ricetta(nome_ricetta)->ingredienti->peso);
+    elimina_ricetta("torta");
+    print_table();
+    // Inizializzazione della hash table del magazzino
+    MagazzinoHashTable magazzino;
+    magazzino.size = TABLE_SIZE;
+    magazzino.cells = (IngredienteHashNode**)calloc(TABLE_SIZE, sizeof(IngredienteHashNode*));
 
-    // Ricetta torta = {.nome = "farina"};
-    // Ricetta panna = {.nome = "zucchero"};
-    // hash_insert(&torta);
-    // hash_insert(&panna);
-    // print_table();
-    // Ricetta *tmp = hash_lookup("farina");
-    // if(tmp==NULL){
-    //     printf("non nella tabella\n");
-    // }else{
-    //     printf("\nnella tabella  %s\n",tmp->nome);
-    // }
-    // hash_delete("farina");
-    // print_table();
+    // Esempio di rifornimento
+    rifornimento(&magazzino, "zucchero", 100, 10);
+    rifornimento(&magazzino, "farina", 200, 12);
+    rifornimento(&magazzino, "zucchero", 50, 13);
 
-
-    /*printf("torta ==> %u\n", hash("torta"));
-    printf("pane ==> %u\n", hash("pane"));
-    printf("sfoglia ==> %u\n", hash("sfoglia"));
-    printf("caramella ==> %u\n", hash("caramella"));
-    printf("sorbetto ==> %u\n", hash("sorbetto"));
-    printf("biscotto ==> %u\n", hash("biscotto"));*/
-
+    // Stampa del contenuto del magazzino per verifica
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        IngredienteHashNode* node = magazzino.cells[i];
+        while (node != NULL) {
+            printf("Ingrediente: %s, Peso Totale: %d\n", node->key, node->total_weight);
+            for (int j = 0; j < node->min_heap.size; j++) {
+                printf("  Scadenza: %d, Peso: %d\n", node->min_heap.nodes[j].expiry, node->min_heap.nodes[j].weight);
+            }
+            node = node->next;
+        }
+    }
+    //esempio rimozione ingrediente quasta forse chiamata dal main ma semplicemente quando andiamo a fare una ricetta chiamiamo questa funzione
+    //su tutti gli elementi per vedere se sono scaduti e poi in base agli elementi rimasti si vede se va bene fare la ricetta o no
+    rimuovi_ingredient(&magazzino,"zucchero",11);
+    // Stampa del contenuto del magazzino per verifica
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        IngredienteHashNode* node = magazzino.cells[i];
+        while (node != NULL) {
+            printf("Ingrediente: %s, Peso Totale: %d\n", node->key, node->total_weight);
+            for (int j = 0; j < node->min_heap.size; j++) {
+                printf("  Scadenza: %d, Peso: %d\n", node->min_heap.nodes[j].expiry, node->min_heap.nodes[j].weight);
+            }
+            node = node->next;
+        }
+    }
     return 0;
+
 }
 /*
  Nel main leggiamo la prima stringa e poi possiamo utilizzare una funzione che anazlizza la stringa letta e a seconda che sia:
