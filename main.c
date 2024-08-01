@@ -438,3 +438,14 @@ Ricetta *crea_ricetta(char *s){
 
     return nuova_ricetta;
 }
+
+//TODO
+//1. Carretto -> coda ordini completi (salvando t a cui sono state completate, poi da stampare), in attesa di essere caricare sul carretto.
+//creare struct per ordine che ha nome ricetta e t di completamento, che è una lista puntata (coda)
+//2. Carretto -> carico degli ordini sul carretto, in ordine di peso
+//3. Rivedere rimozione ingrediente nel momento in cui si cucina una ricetta (con attenzione alla scadenza)
+//4. Main -> lettura stringa e chiamata funzione corretta
+//5. Funzioni varie -> aggiungere stampe corrette
+//6. Gestione del tempo -> incrementare variabile per ogni riga letta.
+//7. Coda per ordini in attesa -> creare coda per ordini in attesa di essere completati.
+//Ogni volta che arriva un ingrediente nuova, controllare se è possibile completare una ricetta in attesa.
