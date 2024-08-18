@@ -87,6 +87,7 @@ void ordina_per_peso(coda_ordini* head);
 void stampa_ordini(coda_ordini* head);
 
 int main() {
+
     int t=0,tempo_carretto,peso_carretto;
     MagazzinoHashTable magazzino;
     coda_ordini* ordini_completi = NULL;
