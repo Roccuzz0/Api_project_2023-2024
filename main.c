@@ -91,12 +91,15 @@ int main() {
     MagazzinoHashTable magazzino;
     coda_ordini* ordini_completi = NULL;
     coda_ordini* ordini_in_sospeso = NULL;
-    scanf("%d", &tempo_carretto);//taglio la stringa, metto il primo elemento in tempo_carretto,metto il secondo elemento in peso_carretto
+    if (scanf("%d %d", &tempo_carretto, &peso_carretto) != 2) {
+        return 1; // o un altro codice di errore
+    }
     do {
         if(t % tempo_carretto==0 && t != 0){
             spedisci_ordini(ordini_completi,peso_carretto);
         }
-        fgets(buff, sizeof(buff), stdin);//metodo per prendere la riga con tutti gli spazi
+        char *result = fgets(buff, sizeof(buff), stdin);
+        (void)result;  // sopprimo il warning per la variabile non utilizzata
         char* token = strtok(buff," ");//informazione sul comando da fare
         char* funz = strtok(NULL, "");//ottengo il resto della stringa
         if(strcmp(token,"aggiungi_ricetta")==0){
@@ -356,7 +359,7 @@ void prepara_ordine(MagazzinoHashTable* magazzino, int curr_time, coda_ordini* o
 
         // Verifica la disponibilità degli ingredienti
         while (ingrediente_corrente != NULL) {
-            int quantità_richiesta = ordini_sospesi->quantita * ingrediente_corrente->peso;
+            int quantita_richiesta = ordini_sospesi->quantita * ingrediente_corrente->peso;
             IngredienteHashNode* nodo_ingrediente = magazzino->cells[hash(ingrediente_corrente->nome)];
 
             if (!nodo_ingrediente) {
@@ -368,7 +371,7 @@ void prepara_ordine(MagazzinoHashTable* magazzino, int curr_time, coda_ordini* o
             remove_expired_from_heap(&nodo_ingrediente->min_heap, curr_time);
 
             // Ricontrolla la disponibilità degli ingredienti
-            if (nodo_ingrediente->total_weight < quantità_richiesta) {
+            if (nodo_ingrediente->total_weight < quantita_richiesta) {
                 ingredienti_disponibili = false;  // Non c'è abbastanza quantità
                 break;
             }
