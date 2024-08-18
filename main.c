@@ -25,7 +25,7 @@ typedef struct IngredienteHashNode {
     char *key; //nome ingrediente
     int total_weight; //quantità totale in dell'ingrediente
     IngredienteMinHeap min_heap; //riferimento ad albero per pescare quelle con il T minore
-    struct HashNode *next; // riferimento al nodo successivo
+    struct IngredienteHashNode *next; // riferimento al nodo successivo
 } IngredienteHashNode;
 
 typedef struct MagazzinoHashTable {
@@ -56,7 +56,7 @@ typedef struct coda_ordini{
     int quantita;
     int tempo_richiesta;//tempo in cui vengono richiesti,mi è sembrato di capire che non dobbiamo stampare quando vengono completati
     int peso_totale;
-    struct coda_ordini* next;
+    struct coda_ordini** next;
 }coda_ordini;
 
 
@@ -71,17 +71,17 @@ void init_hash();
 void print_table();
 bool aggiungi_ricetta(Ricetta *r);
 Ricetta* cerca_ricetta(char* nome);
-void elimina_ricetta(char* nome,coda_ordini *ordini_in_sospeso);
+void elimina_ricetta(char* nome,coda_ordini **ordini_in_sospeso);
 Ricetta* crea_ricetta(char* s);
 Ingrediente* crea_ingrediente();
 Ingrediente* inserisci_ingrediente(Ingrediente* head, char* nome, int);
 HeapNode extract_min(IngredienteMinHeap* min_heap);
 void remove_expired_from_heap(IngredienteMinHeap* min_heap, int current_time);
-coda_ordini* crea_coda_comp();
-coda_ordini* inserisci_ordine_completo(coda_ordini* head, char* nome, int quantita, int tempo, int peso_totale);
-coda_ordini* inserisci_ordine_in_sospeso(coda_ordini* head, char* string);
-coda_ordini* rimuovi_primo_ordine_completo(coda_ordini* head);
-void prepara_ordine(MagazzinoHashTable* magazzino, int curr_time, coda_ordini* ordini_completati, coda_ordini* ordini_in_sospeso);
+coda_ordini** crea_coda_comp();
+coda_ordini** inserisci_ordine_completo(coda_ordini** head, char* nome, int quantita, int tempo, int peso_totale);
+coda_ordini** inserisci_ordine_in_sospeso(coda_ordini** head, char* string);
+coda_ordini** rimuovi_primo_ordine_completo(coda_ordini* head);
+void prepara_ordine(MagazzinoHashTable* magazzino, int curr_time, coda_ordini** ordini_completati, coda_ordini** ordini_in_sospeso);
 void spedisci_ordini(coda_ordini** ordini_completi, int peso_carretto);
 void ordina_per_peso(coda_ordini** head);
 void stampa_ordini(coda_ordini* head);
@@ -89,9 +89,8 @@ void stampa_ordini(coda_ordini* head);
 int main() {
     int t=0,tempo_carretto,peso_carretto;
     MagazzinoHashTable magazzino;
-    coda_ordini* ordini_completi;
-    coda_ordini* ordini_in_sospeso;
-    char* dati;
+    coda_ordini** ordini_completi;
+    coda_ordini** ordini_in_sospeso;
     scanf("%d %d", &tempo_carretto, &peso_carretto);//taglio la stringa, metto il primo elemento in tempo_carretto,metto il secondo elemento in peso_carretto
     do {
         if(t % tempo_carretto==0 && t != 0){
@@ -116,7 +115,7 @@ int main() {
             prepara_ordine(&magazzino, t, ordini_completi, ordini_in_sospeso);
         }
         t++;
-    }while(strcmp(buff,NULL)==0);
+    }while(buff != NULL);
 /* Mancano coda ordini da fare, coda ordini emessi
  */
 //    init_hash();
@@ -331,24 +330,24 @@ void remove_expired_from_heap(IngredienteMinHeap* min_heap, int current_time) {
 }
 
 
-void prepara_ordine(MagazzinoHashTable* magazzino, int curr_time, coda_ordini* ordini_completati, coda_ordini* ordini_sospesi) {
+void prepara_ordine(MagazzinoHashTable* magazzino, int curr_time, coda_ordini** ordini_completati, coda_ordini** ordini_sospesi) {
     //caso in cui chiamo prepara ordini dla rifornimento
     if(ordini_sospesi==NULL){
         return;
     }
     // Inizializza i puntatori per scorrere la coda degli ordini sospesi
-    coda_ordini* curr = ordini_sospesi;
-    coda_ordini* prec = NULL;
+    coda_ordini** curr = ordini_sospesi;
+    coda_ordini** prec = NULL;
 
     while (curr != NULL) {
-        char *nome_ricetta = curr->nome_ricetta;
-        int quantita = curr->quantita;
-        int tempo_richiesta = curr->tempo_richiesta;
-        Ricetta* ricetta = cerca_ricetta(curr->nome_ricetta);
+        char *nome_ricetta = (*curr)->nome_ricetta;
+        int quantita = (*curr)->quantita;
+        int tempo_richiesta = (*curr)->tempo_richiesta;
+        Ricetta* ricetta = cerca_ricetta((*curr)->nome_ricetta);
         if (!ricetta) {
             // Ricetta non trovata, continua con il prossimo ordine
             prec = curr;
-            curr = curr->next;
+            curr = (*curr)->next;
             continue;
         }
 
@@ -357,7 +356,7 @@ void prepara_ordine(MagazzinoHashTable* magazzino, int curr_time, coda_ordini* o
 
         // Verifica la disponibilità degli ingredienti
         while (ingrediente_corrente != NULL) {
-            int quantità_richiesta = ordini_sospesi->quantita * ingrediente_corrente->peso;
+            int quantità_richiesta = (*ordini_sospesi)->quantita * ingrediente_corrente->peso;
             IngredienteHashNode* nodo_ingrediente = magazzino->cells[hash(ingrediente_corrente->nome)];
 
             if (!nodo_ingrediente) {
@@ -407,19 +406,19 @@ void prepara_ordine(MagazzinoHashTable* magazzino, int curr_time, coda_ordini* o
 
             // Rimuove l'ordine completato dalla coda degli ordini sospesi
             if (prec) {
-                prec->next = curr->next;
+                (*prec)->next = (*curr)->next;
             } else {
-                ordini_sospesi = curr->next;
+                ordini_sospesi = (*curr)->next;
             }
 
             coda_ordini* temp = curr;
-            curr = curr->next;
+            curr = (*curr)->next;
             free(temp->nome_ricetta);
             free(temp);
         } else {
             // Avanza al prossimo ordine
             prec = curr;
-            curr = curr->next;
+            curr = (*curr)->next;
         }
     }
 }
@@ -520,7 +519,7 @@ Ricetta *cerca_ricetta(char *nome){
     }
     return NULL;
 }
-void elimina_ricetta(char *nome,coda_ordini *ordini_sospesi){//cancello un elemento e ritorno l'elemento cancellato
+void elimina_ricetta(char *nome,coda_ordini **ordini_sospesi){//cancello un elemento e ritorno l'elemento cancellato
     int index = hash(nome);
     for (int i = 0; i < TABLE_SIZE; ++i) {
         int try = (i + index) % TABLE_SIZE;
@@ -627,7 +626,7 @@ coda_ordini* crea_coda_comp(){
     return temp;
 }
 
-coda_ordini* inserisci_ordine_completo(coda_ordini* head, char* nome, int quantita, int tempo, int peso){
+coda_ordini* inserisci_ordine_completo(coda_ordini** head, char* nome, int quantita, int tempo, int peso){
     coda_ordini * temp;
     temp=crea_coda_comp();
     temp->nome_ricetta = nome;
@@ -646,7 +645,7 @@ coda_ordini* inserisci_ordine_completo(coda_ordini* head, char* nome, int quanti
     }
     return head;
 }
-coda_ordini* inserisci_ordine_in_sospeso(coda_ordini* head, char* string) {
+coda_ordini* inserisci_ordine_in_sospeso(coda_ordini** head, char* string) {
     char* nome = strtok(string, " ");
     int tempo = atoi(strtok(NULL," "));
     // Verifica se la ricetta è presente nella hash map
