@@ -3,8 +3,8 @@
 #include <string.h>
 #include <stdbool.h>
 #define MAX_NAME 256
-#define MIN_HEAP_CAPACITY 10
-#define TABLE_SIZE 10
+#define MIN_HEAP_CAPACITY 50
+#define TABLE_SIZE 50
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFFUL)
 char buff[100000];
 
@@ -67,9 +67,13 @@ void elimina_ricetta(char *nome,coda_ordini *ordini_sospesi);
 void rifornimento(magazzinoHashTable* magazzino, char* string);
 void insert_min_heap(ingredienteMinHeap* min_heap, heapNode node);
 void trim_trailing_whitespace(char* str);
-
-
-
+coda_ordini* inserisci_ordine_in_sospeso(coda_ordini* ordini_in_sospeso, char* string, int tempo);
+coda_ordini* crea_ordine();
+void stampa_coda_ordini(coda_ordini* ordini_in_sospeso);
+heapNode extract_min(ingredienteMinHeap* min_heap);
+void prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda_ordini** ordini_completi, coda_ordini** ordini_in_sospeso);
+void remove_expired_from_heap(ingredienteMinHeap* min_heap, int current_time);
+coda_ordini* inserisci_ordine_completo(coda_ordini* head, char* nome, int quantita, int tempo, int peso);
 
 int main(){
     init_hash();
@@ -77,20 +81,19 @@ int main(){
     magazzinoHashTable magazzino;
     init_magazzino(&magazzino,TABLE_SIZE);
     int tempo_carretto,peso_carretto;
-    coda_ordini *ordini_completi;
+    coda_ordini *ordini_completi = NULL;
     coda_ordini *ordini_in_sospeso = NULL;
-//    if (scanf("%d %d\n", &tempo_carretto, &peso_carretto) != 2) {
-//        return 1; // o un altro codice di errore
-//    }
+    if (scanf("%d %d\n", &tempo_carretto, &peso_carretto) != 2) {
+        return 1; // o un altro codice di errore
+    }
     do{
-//        if(t % tempo_carretto==0 && t != 0){
-//            //spedisci_ordini(ordini_completi,peso_carretto);
-//        }
+        if(t % tempo_carretto==0 && t != 0){
+            //spedisci_ordini(ordini_completi,peso_carretto);
+        }
         char *result = fgets(buff, sizeof(buff), stdin);
         (void)result;  // sopprimo il warning per la variabile non utilizzata
         char* token = strtok(buff," ");//informazione sul comando da fare
         char* funz = strtok(NULL, "");//ottengo il resto della riga
-        printf("%s\n", token);
         if(strcmp(token,"aggiungi_ricetta")==0){
             aggiungi_ricetta(funz);
             print_table();
@@ -101,11 +104,18 @@ int main(){
         else if(strcmp(token,"rifornimento")==0){
             rifornimento(&magazzino,funz);
             print_magazzino(&magazzino);
-            //prepara_ordine(&magazzino, t, ordini_completi, ordini_in_sospeso);
+            prepara_ordine(&magazzino, t, &ordini_completi, &ordini_in_sospeso);
+            stampa_coda_ordini(ordini_completi);
         }
         else if(strcmp(token,"ordine")==0){
-            //inserisci_ordine_in_sospeso(ordini_in_sospeso,funz);
-            //prepara_ordine(&magazzino, t, ordini_completi, ordini_in_sospeso);
+            ordini_in_sospeso = inserisci_ordine_in_sospeso(ordini_in_sospeso,funz, t);
+            printf("ordini in sospeso:");
+            stampa_coda_ordini(ordini_in_sospeso);
+            printf("ordini in completi:");
+            stampa_coda_ordini(ordini_completi);
+            prepara_ordine(&magazzino, t, &ordini_completi, &ordini_in_sospeso);
+            printf("ordini in completi:");
+            stampa_coda_ordini(ordini_completi);
         }else{
             break;
         }
@@ -250,7 +260,6 @@ ricetta *crea_ricetta(char* nome_ricetta, char *funz){
     nuova_ricetta->ingredienti = head;
     return nuova_ricetta;
 }
-
 coda_ingredienti* inserisci_ingrediente(coda_ingredienti* head, char* nome, int peso){
     coda_ingredienti* temp;
     temp = crea_ingrediente();
@@ -262,13 +271,13 @@ coda_ingredienti* inserisci_ingrediente(coda_ingredienti* head, char* nome, int 
     head = temp;
     return head;
 }
-
 coda_ingredienti * crea_ingrediente(){
     coda_ingredienti * temp;
     temp = (coda_ingredienti *)malloc(sizeof(coda_ingredienti));
     temp->next = NULL;
     return temp;
 }
+
 void elimina_ricetta(char *nome_ricetta, coda_ordini *ordini_sospesi) {
     char* nome = strtok(nome_ricetta," ");
     trim_trailing_whitespace(nome);
@@ -297,6 +306,7 @@ void elimina_ricetta(char *nome_ricetta, coda_ordini *ordini_sospesi) {
         }
     }
 }
+
 void rifornimento(magazzinoHashTable* magazzino, char* string) {
     char* ingrediente = strtok(string, " ");
     while (ingrediente != NULL){
@@ -375,7 +385,202 @@ void insert_min_heap(ingredienteMinHeap* min_heap, heapNode node) {
         swap_node(&min_heap->nodes[index], &min_heap->nodes[(index - 1) / 2]);
         index = (index - 1) / 2;
     }
+}coda_ordini* inserisci_ordine_in_sospeso(coda_ordini* ordini_in_sospeso, char* string, int tempo) {
+    // Crea una copia della stringa per evitare modifiche
+    char* nome = strtok(strdup(string), " ");
+    int quantita = atoi(strtok(NULL, " "));
+    // Verifica se la ricetta è presente nella hash map
+    int index = hash(nome);
+    bool ricetta_trovata = false;
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        int try = (i + index) % TABLE_SIZE;
+        if (ricette_hash_table[try] != NULL && ricette_hash_table[try] != DELETED_NODE) {
+            if (strcmp(ricette_hash_table[try]->nome, nome) == 0) {
+                ricetta_trovata = true;
+                break;
+            }
+        }
+    }
+    // Stampa "Accettato" o "Rifiutato" in base alla presenza della ricetta
+    if (ricetta_trovata) {
+        printf("accettato\n");
+
+        // Creazione del nuovo nodo per la coda degli ordini
+        coda_ordini *temp = crea_ordine();
+        temp->nome_ricetta = strdup(nome);  // Copia del nome della ricetta
+        temp->quantita = quantita;
+        temp->tempo_richiesta = tempo;
+        temp->peso_totale = 0;
+        temp->next = NULL;
+
+        // Inserimento nella coda
+        if (ordini_in_sospeso == NULL) {
+            ordini_in_sospeso = temp;
+        } else {
+            coda_ordini* var = ordini_in_sospeso;
+            while (var->next != NULL) {
+                var = var->next;
+            }
+            var->next = temp;
+        }
+    } else {
+        printf("rifiutato\n");
+    }
+
+    // Libera la memoria temporanea allocata per la stringa 'nome'
+    free(nome);
+
+    return ordini_in_sospeso;
 }
+coda_ordini* crea_ordine(){
+    coda_ordini* temp;
+    temp = (coda_ordini*)malloc(sizeof(coda_ordini));
+    temp->next = NULL;
+    return temp;
+}
+void stampa_coda_ordini(coda_ordini* ordini_in_sospeso) {
+    if (ordini_in_sospeso == NULL) {
+        printf("La coda degli ordini e' vuota.\n");
+        return;
+    }
+    coda_ordini* current = ordini_in_sospeso;
+    while (current != NULL) {
+        printf("Ordine: %s, Quantita: %d, Tempo di richiesta: %d\n",
+               current->nome_ricetta, current->quantita, current->tempo_richiesta);
+        current = current->next;
+    }
+}
+void prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda_ordini** ordini_completi, coda_ordini** ordini_in_sospeso) {
+    if (*ordini_in_sospeso == NULL) {
+        return;
+    }
+
+    coda_ordini* curr = *ordini_in_sospeso;
+    coda_ordini* prec = NULL;
+
+    while (curr != NULL) {
+        char* nome_ricetta = curr->nome_ricetta;
+        int quantita = curr->quantita;
+        int tempo_richiesta = curr->tempo_richiesta;
+        ricetta* ricetta = cerca_ricetta(nome_ricetta);
+
+        if (!ricetta) {
+            prec = curr;
+            curr = curr->next;
+            continue;
+        }
+
+        bool ingredienti_disponibili = true;
+        coda_ingredienti* ingrediente_corrente = ricetta->ingredienti;
+
+        while (ingrediente_corrente != NULL) {
+            int quantita_richiesta = quantita * ingrediente_corrente->peso;
+            ingredienteHashNode* nodo_ingrediente = magazzino->cells[hash(ingrediente_corrente->nome)];
+
+            if (!nodo_ingrediente) {
+                ingredienti_disponibili = false;
+                break;
+            }
+
+            remove_expired_from_heap(&nodo_ingrediente->min_heap, curr_time);
+
+            if (nodo_ingrediente->total_weight < quantita_richiesta) {
+                ingredienti_disponibili = false;
+                break;
+            }
+
+            ingrediente_corrente = ingrediente_corrente->next;
+        }
+
+        if (ingredienti_disponibili) {
+            int peso_totale = 0;
+            ingrediente_corrente = ricetta->ingredienti;
+
+            while (ingrediente_corrente != NULL) {
+                int quantita_richiesta = quantita * ingrediente_corrente->peso;
+                peso_totale += quantita_richiesta;
+                ingredienteHashNode* nodo_ingrediente = magazzino->cells[hash(ingrediente_corrente->nome)];
+
+                while (quantita_richiesta > 0) {
+                    heapNode min_node = extract_min(&nodo_ingrediente->min_heap);
+                    if (min_node.weight <= quantita_richiesta) {
+                        quantita_richiesta -= min_node.weight;
+                        nodo_ingrediente->total_weight -= min_node.weight;
+                    } else {
+                        min_node.weight -= quantita_richiesta;
+                        nodo_ingrediente->total_weight -= quantita_richiesta;
+                        quantita_richiesta = 0;
+                        insert_min_heap(&nodo_ingrediente->min_heap, min_node);
+                    }
+                }
+
+                ingrediente_corrente = ingrediente_corrente->next;
+            }
+
+            *ordini_completi = inserisci_ordine_completo(*ordini_completi, nome_ricetta, quantita, tempo_richiesta, peso_totale);
+
+            if (prec) {
+                prec->next = curr->next;
+            } else {
+                *ordini_in_sospeso = curr->next;
+            }
+
+            coda_ordini* temp = curr;
+            curr = curr->next;
+            free(temp->nome_ricetta);
+            free(temp);
+        } else {
+            prec = curr;
+            curr = curr->next;
+        }
+    }
+}
+
+// Funzione per estrarre il nodo con la scadenza minima dal Min-Heap
+heapNode extract_min(ingredienteMinHeap* min_heap) {
+    if (min_heap->size <= 0) {
+        heapNode empty_node = {0, 0};  // Nodo vuoto da restituire in caso di heap vuoto
+        return empty_node;
+    }
+    if (min_heap->size == 1) {
+        min_heap->size--;
+        return min_heap->nodes[0];
+    }
+    // Prendi la radice (minimo)
+    heapNode root = min_heap->nodes[0];
+    // Sostituisci la radice con l'ultimo nodo e riduci la dimensione dell'heap
+    min_heap->nodes[0] = min_heap->nodes[min_heap->size - 1];
+    min_heap->size--;
+    // Riordina l'heap
+    min_heapify(min_heap, 0);
+
+    return root;
+}
+//guardo solo il primo, T < curr rimuovo e vado avanti se no esco dal while, complessita o(log(n)) per rimuovere e nel caso peggiore viene fatto n volte
+void remove_expired_from_heap(ingredienteMinHeap* min_heap, int current_time) {
+    while (min_heap->size > 0 && min_heap->nodes[0].expiry < current_time) {
+        extract_min(min_heap);  // Rimuovi l'elemento scaduto
+    }
+}
+coda_ordini* inserisci_ordine_completo(coda_ordini* head, char* nome, int quantita, int tempo, int peso) {
+    coda_ordini* temp = crea_ordine();
+    temp->nome_ricetta = strdup(nome);  // Duplica il nome
+    temp->quantita = quantita;
+    temp->tempo_richiesta = tempo;
+    temp->peso_totale = peso;
+    temp->next = NULL;
+    if (head == NULL) {
+        head = temp;
+    } else {
+        coda_ordini* var = head;
+        while (var->next != NULL) {
+            var = var->next;
+        }
+        var->next = temp;
+    }
+    return head;
+}
+
 
 //unsigned int hash(char* ricetta);
 //void swap_node(HeapNode* a, HeapNode* b);
@@ -400,96 +605,7 @@ void insert_min_heap(ingredienteMinHeap* min_heap, heapNode node) {
 //void spedisci_ordini(coda_ordini* ordini_completi, int peso_carretto);
 //void ordina_per_peso(coda_ordini* head);
 //void stampa_ordini(coda_ordini* head);
-//
-//int main() {
-//
-//    MagazzinoHashTable magazzino;
-//        else if(strcmp(token,"rifornimento")==0){
-//            rifornimento(&magazzino,funz);
-//            prepara_ordine(&magazzino, t, ordini_completi, ordini_in_sospeso);
-//        }
-//        else if(strcmp(token,"ordine")==0){
-//            inserisci_ordine_in_sospeso(ordini_in_sospeso,funz);
-//            prepara_ordine(&magazzino, t, ordini_completi, ordini_in_sospeso);
-//        }
-//        t++;
-//    }while(buff != NULL);
-//    return 0;
-///* Mancano coda ordini da fare, coda ordini emessi
-// */
-////    init_hash();
-////    print_table(); // stampa tabella vuota
-////    MagazzinoHashTable magazzino;
-////    coda_ordini* ordini_completi = NULL;
-////    coda_ordini* ordini_in_sospeso = NULL;
-////    //Simula inerimento di una ricetta
-////    char aggiungi_ricetta_test[] = "torta farina 100 cioccolato 50 uova 20";
-////    char nome_ricetta[10];
-////    int i = 0;
-////    while(aggiungi_ricetta_test[i] != ' '){
-////        nome_ricetta[i] = aggiungi_ricetta_test[i];
-////        i++;
-////    }
-////    nome_ricetta[i] = '\0';
-////    if(cerca_ricetta(nome_ricetta) == NULL){
-////        Ricetta* nuova_ricetta = crea_ricetta(aggiungi_ricetta_test);
-////        aggiungi_ricetta(nuova_ricetta);
-////    }
-////    char aggiungi_ricetta_tes[] = "casa farina 100 cioccolato 50 uova 20";
-////    while(aggiungi_ricetta_tes[i] != ' '){
-////        nome_ricetta[i] = aggiungi_ricetta_tes[i];
-////        i++;
-////    }
-////    nome_ricetta[i] = '\0';
-////    if(cerca_ricetta(nome_ricetta) == NULL){
-////        Ricetta* nuova_ricetta = crea_ricetta(aggiungi_ricetta_tes);
-////        aggiungi_ricetta(nuova_ricetta);
-////    }
-////
-////    print_table();
-////
-////    printf("%s %d\n", cerca_ricetta(nome_ricetta)->ingredienti->nome, cerca_ricetta(nome_ricetta)->ingredienti->peso);
-////
-////    print_table();
-////    // Inizializzazione della hash table del magazzino
-////    magazzino.size = TABLE_SIZE;
-////    magazzino.cells = (IngredienteHashNode**)calloc(TABLE_SIZE, sizeof(IngredienteHashNode*));
-////
-////    // Esempio di rifornimento
-////    rifornimento(&magazzino, "zucchero 200 10");
-////    rifornimento(&magazzino, "farina 200 12");
-////    rifornimento(&magazzino, "zucchero 50 13");
-////    rifornimento(&magazzino, "pana 50 13");
-////
-////
-////    // Stampa del contenuto del magazzino per verifica
-////    for (int i = 0; i < TABLE_SIZE; i++) {
-////        IngredienteHashNode *node = magazzino.cells[i];
-////        while (node != NULL) {
-////            printf("Ingrediente: %s, Peso Totale: %d\n", node->key, node->total_weight);
-////            for (int j = 0; j < node->min_heap.size; j++) {
-////                printf("  Scadenza: %d, Peso: %d\n", node->min_heap.nodes[j].expiry, node->min_heap.nodes[j].weight);
-////            }
-////            node = node->next;
-////        }
-////    }
-//////    }
-//////    //esempio rimozione ingrediente quasta forse chiamata dal main ma semplicemente quando andiamo a fare una ricetta chiamiamo questa funzione
-//////    //su tutti gli elementi per vedere se sono scaduti e poi in base agli elementi rimasti si vede se va bene fare la ricetta o no
-//////    //rimuovi_ingredient(&magazzino,"zucchero",11);
-//////    // Stampa del contenuto del magazzino per verifica
-//////    for (int i = 0; i < TABLE_SIZE; i++) {
-//////        IngredienteHashNode* node = magazzino.cells[i];
-//////        while (node != NULL) {
-//////            printf("Ingrediente: %s, Peso Totale: %d\n", node->key, node->total_weight);
-//////            for (int j = 0; j < node->min_heap.size; j++) {
-//////                printf("  Scadenza: %d, Peso: %d\n", node->min_heap.nodes[j].expiry, node->min_heap.nodes[j].weight);
-//////            }
-//////            node = node->next;
-//////        }
-//    return 0;
-//}
-///*
+
 // Nel main leggiamo la prima stringa e poi possiamo utilizzare una funzione che anazlizza la stringa letta e a seconda che sia:
 // 1)una ricetta da aggiungere/rimuovere/visualizza ingredienti;
 // 2)il tempo del camioncino, ovvero ogni quanti t passa;
@@ -519,102 +635,7 @@ void insert_min_heap(ingredienteMinHeap* min_heap, heapNode node) {
 // per le stampe devo ancora vedere bene ma credo basti scrivere tutti gli ordini che riesce a stampare, le ricette quando vengono aggiunte
 // e rimosse e poi non saprei.
 // */
-//
-//
-//unsigned int hash(char *ricetta) {
-//    int length = strnlen(ricetta, MAX_NAME);
-//    unsigned int hash_value = 0;
-//    for (int i = 0; i < length; ++i) {
-//        hash_value += ricetta[i];
-//        hash_value = (hash_value * ricetta[i]) % TABLE_SIZE;
-//    }
-//    return hash_value;
-//}
-//// funzione per swappare i nodi
-//void swap_node(HeapNode* a, HeapNode* b) {
-//    HeapNode temp = *a;
-//    *a = *b;
-//    *b = temp;
-//}
-//
-////ordinamento del min heap
-//void min_heapify(IngredienteMinHeap* min_heap, int index) {
-//    int smallest = index;
-//    int left = 2 * index + 1;
-//    int right = 2 * index + 2;
-//
-//    // controllo se i figli sono dentro i limiti dell'heap
-//    if (left < min_heap->size && min_heap->nodes[left].expiry < min_heap->nodes[smallest].expiry) {
-//        smallest = left;
-//    }
-//
-//    if (right < min_heap->size && min_heap->nodes[right].expiry < min_heap->nodes[smallest].expiry) {
-//        smallest = right;
-//    }
-//
-//    // se il nodo più piccolo non è l'indice corrente, swap e continua a fare heapify
-//    if (smallest != index) {
-//        swap_node(&min_heap->nodes[smallest], &min_heap->nodes[index]);
-//        min_heapify(min_heap, smallest);
-//    }
-//}
-//
-////funzione di inserimento del min heap
-//void insert_min_heap(IngredienteMinHeap* min_heap, HeapNode node) {
-//    // Controlla se l'heap è pieno e, in tal caso, raddoppia la capacità
-//    if (min_heap->size == min_heap->capacity) {
-//        min_heap->capacity *= 2;
-//        HeapNode* new_nodes = (HeapNode*)realloc(min_heap->nodes, min_heap->capacity * sizeof(HeapNode));
-//        if (new_nodes == NULL) {
-//            // Gestisci l'errore di allocazione
-//            perror("Errore di allocazione memoria");
-//            exit(EXIT_FAILURE);
-//        }
-//        min_heap->nodes = new_nodes;
-//    }
-//
-//    // Aggiungi il nuovo nodo alla fine dell'heap
-//    int index = min_heap->size++;
-//    min_heap->nodes[index] = node;
-//
-//    // Riordina l'heap verso l'alto
-//    while (index != 0 && min_heap->nodes[(index - 1) / 2].expiry > min_heap->nodes[index].expiry) {
-//        swap_node(&min_heap->nodes[index], &min_heap->nodes[(index - 1) / 2]);
-//        index = (index - 1) / 2;
-//    }
-//}
-//
-//void rifornimento(MagazzinoHashTable* magazzino, char* string) {
-//    char* ingrediente = strtok(string, " ");
-//    while (ingrediente != NULL){
-//        int peso_ingrediente = atoi(strtok(NULL," "));
-//        int scadenza_ingrediente = atoi(strtok(NULL," "));
-//        int index = hash(ingrediente);
-//        IngredienteHashNode* ingrediente_node = magazzino->cells[index];
-//
-//        //se non esiste il nodo lo crea e setta tutto a zero
-//        if (ingrediente_node == NULL) {
-//            // creazione del nuovo nodo se l'ingediente non è trovato
-//            ingrediente_node = (IngredienteHashNode*)malloc(sizeof(IngredienteHashNode));
-//            ingrediente_node->key = strdup(ingrediente);
-//            ingrediente_node->total_weight = 0;
-//            ingrediente_node->min_heap.size = 0;
-//            ingrediente_node->min_heap.capacity = MIN_HEAP_CAPACITY; // Capacità iniziale
-//            ingrediente_node->min_heap.nodes = (HeapNode*)malloc(ingrediente_node->min_heap.capacity * sizeof(HeapNode));
-//            ingrediente_node->next = magazzino->cells[index];
-//            magazzino->cells[index] = ingrediente_node;
-//        }
-//        // aggiorna il peso totale
-//        ingrediente_node->total_weight += peso_ingrediente;
-//        // inserisci il nuovo nodo nel min heap
-//        HeapNode new_node = { .expiry = scadenza_ingrediente, .weight = peso_ingrediente };
-//        insert_min_heap(&ingrediente_node->min_heap, new_node);
-//        ingrediente = strtok(NULL, " ");
-//    }
-//    printf("rifornito\n");
-//
-//}
-//
+
 //// Funzione per estrarre il nodo con la scadenza minima dal Min-Heap
 //HeapNode extract_min(IngredienteMinHeap* min_heap) {
 //    if (min_heap->size <= 0) {
@@ -775,183 +796,9 @@ void insert_min_heap(ingredienteMinHeap* min_heap, heapNode node) {
 ////}
 //
 ////creo la tabella di hash
-//void init_hash() {
-//    for (int i = 0; i < TABLE_SIZE; ++i) {
-//        ricette_hash_table[i] = NULL; //table is empty
-//    }
-//}
+
 ////stampo la hash
-//void print_table() {
-//    printf("Start\n");
-//    for (int i = 0; i < TABLE_SIZE; ++i) {
-//        if (ricette_hash_table[i] == NULL) {
-//            printf("\t%i\t---\n", i);
-//        } else if(ricette_hash_table[i]==DELETED_NODE) {
-//            printf("\t%i\t---<deleted>\n", i);
-//        } else {
-//            printf("\t%i\t%s\n", i, ricette_hash_table[i]->nome);
-//        }
-//    }
-//    printf("end\n");
-//}void aggiungi_ricetta(Ricetta *r) {
-//    if (r == NULL) return;
-//
-//    // Calcola l'indice iniziale
-//    int index = hash(r->nome);
-//
-//    // Verifica se la ricetta è già presente nella tabella hash
-//    if (cerca_ricetta(r->nome) != NULL) {
-//        print_table();
-//        printf("ignorato\n");
-//        print_table();
-//        return;
-//    }
-//
-//    // Usa il probing per trovare una cella disponibile
-//    for (int i = 0; i < TABLE_SIZE; i++) {
-//        // Calcola il prossimo indice da provare
-//        int try = (index + i) % TABLE_SIZE;
-//
-//        // Controlla se la cella è vuota o cancellata
-//        if (ricette_hash_table[try] == NULL || ricette_hash_table[try] == DELETED_NODE) {
-//            print_table();
-//
-//            // Inserisce la nuova ricetta nella cella disponibile
-//            ricette_hash_table[try] = r;
-//            printf("aggiunta\n");
-//            print_table();
-//            return;
-//        }
-//    }
-//
-//    // Se tutte le celle sono occupate
-//    printf("Tabella hash piena\n");
-//}
-//
-//
-//
-////trovare una ricetta nella tabella
-//Ricetta *cerca_ricetta(char *nome){
-//    int index = hash(nome);
-//    for (int i = 0; i < TABLE_SIZE; i++) {
-//        int try = (i + index) % TABLE_SIZE;
-//        if(ricette_hash_table[try]==NULL){
-//            return NULL; // not here
-//        }
-//        if(ricette_hash_table[try]==DELETED_NODE) continue;
-//        if (strncmp(ricette_hash_table[index]->nome, nome, TABLE_SIZE)==0){
-//            return ricette_hash_table[try];
-//        }
-//    }
-//    return NULL;
-//}
-//void elimina_ricetta(char *nome,coda_ordini *ordini_sospesi){//cancello un elemento e ritorno l'elemento cancellato
-//    int index = hash(nome);
-//    for (int i = 0; i < TABLE_SIZE; ++i) {
-//        int try = (i + index) % TABLE_SIZE;
-//        if (ricette_hash_table[try]==NULL) {
-//            printf("non presente\n");
-//            return ;
-//        }
-//        while(ordini_sospesi != NULL){
-//            if(strcmp(nome,ordini_sospesi->nome_ricetta)==0){
-//                printf("in sospeso\n");
-//                return;
-//            }
-//            ordini_sospesi = ordini_sospesi->next;
-//        }
-//        if (ricette_hash_table[try]==DELETED_NODE) continue;
-//        if (strncmp(ricette_hash_table[index]->nome, nome, TABLE_SIZE)==0){
-//            //Ricetta *tmp = ricette_hash_table[try];
-//            ricette_hash_table[try] = DELETED_NODE;
-//            printf("rimossa\n");
-//            return ;
-//        }
-//    }
-//    return ;
-//}
-////altro modo per rimuovere la ricetta deallocando spazio, forse leggermente meglio, bisogna stampare correttamente ancora mi sa
-////void rimuovi_ricetta(char *nome) {
-////    int index = hash(nome);
-////    for (int i = 0; i < TABLE_SIZE; i++) {
-////        int try = (i + index) % TABLE_SIZE;
-////        if (ricette_hash_table[try] == NULL) {
-////            // La cella è vuota, quindi non c'è nulla da rimuovere
-////            return;
-////        }
-////        if (ricette_hash_table[try] == DELETED_NODE) {
-////            // La cella è marcata come eliminata, continua a cercare
-////            continue;
-////        }
-////        if (strcmp(ricette_hash_table[try]->nome, nome) == 0) {
-////            // Trova la ricetta da rimuovere
-////            Ricetta *ricetta_da_rimuovere = ricette_hash_table[try];
-////
-////            // Rimuove la ricetta dalla tabella hash
-////            ricette_hash_table[try] = DELETED_NODE;
-////
-////            // Libera la memoria associata alla ricetta
-////            free_ingredienti(ricetta_da_rimuovere->ingredienti);
-////            free(ricetta_da_rimuovere->nome);
-////            free(ricetta_da_rimuovere);
-////
-////            return;
-////        }
-////    }
-////}
-//
-//Ingrediente* crea_ingrediente(){
-//    Ingrediente* temp;
-//    temp = (Ingrediente*)malloc(sizeof(Ingrediente));
-//    temp->next = NULL;
-//    return temp;
-//}
-//
-//Ingrediente* inserisci_ingrediente(Ingrediente* head, char* nome, int peso){
-//    Ingrediente* temp;
-//    temp = crea_ingrediente();
-//    temp->nome = nome;
-//    temp->peso = peso;
-//    if(head != NULL){
-//        temp->next = head;
-//    }
-//    head = temp;
-//    return head;
-//}
-//
-//Ricetta *crea_ricetta(char *s){
-//    Ricetta *nuova_ricetta = (Ricetta*)malloc(sizeof(Ricetta));
-//    char* token = strtok(s, " ");
-//    nuova_ricetta->nome = token;
-//
-//    //primo ingrediente
-//    Ingrediente *head = NULL;
-//    token = strtok(NULL, " ");
-//    char* nome_ingrediente = token;
-//    token = strtok(NULL, " ");
-//    int peso = atoi(token);
-//    head = inserisci_ingrediente(head, nome_ingrediente, peso);
-//    token = strtok(NULL, " ");
-//
-//    //itero fino a fine ingredienti
-//    while(token != NULL){
-//        nome_ingrediente = token;
-//        token = strtok(NULL, " ");
-//        peso = atoi(token);
-//        head = inserisci_ingrediente(head, nome_ingrediente, peso);
-//        token = strtok(NULL, " ");
-//    }
-//    nuova_ricetta->ingredienti = head;
-//    return nuova_ricetta;
-//}
-//
-//coda_ordini* crea_coda_comp(){
-//    coda_ordini* temp;
-//    temp = (coda_ordini*)malloc(sizeof(coda_ordini));
-//    temp->next = NULL;
-//    return temp;
-//}
-//
+
 //coda_ordini* inserisci_ordine_completo(coda_ordini* head, char* nome, int quantita, int tempo, int peso){
 //    coda_ordini * temp;
 //    temp=crea_coda_comp();
@@ -971,47 +818,7 @@ void insert_min_heap(ingredienteMinHeap* min_heap, heapNode node) {
 //    }
 //    return head;
 //}
-//coda_ordini* inserisci_ordine_in_sospeso(coda_ordini* head, char* string) {
-//    char* nome = strtok(string, " ");
-//    int tempo = atoi(strtok(NULL," "));
-//    // Verifica se la ricetta è presente nella hash map
-//    int index = hash(nome);
-//    bool ricetta_trovata = false;
-//    for (int i = 0; i < TABLE_SIZE; i++) {
-//        int try = (i + index) % TABLE_SIZE;
-//        if (ricette_hash_table[try] != NULL && ricette_hash_table[try] != DELETED_NODE) {
-//            if (strcmp(ricette_hash_table[try]->nome, nome) == 0) {
-//                ricetta_trovata = true;
-//                break;
-//            }
-//        }
-//    }
-//    // Stampa "Accettato" o "Rifiutato" in base alla presenza della ricetta
-//    if (ricetta_trovata) {
-//        printf("accettato\n");
-//
-//        // Creazione del nuovo nodo per la coda degli ordini
-//        coda_ordini *temp = crea_coda_comp();
-//        temp->nome_ricetta = nome;
-//        temp->tempo_richiesta = tempo;
-//        temp->next = NULL;
-//        // Inserimento nella coda
-//        if (head == NULL) {
-//            head = temp;
-//        } else {
-//            coda_ordini* var = head;
-//            while (var->next != NULL) {
-//                var = var->next;
-//            }
-//            var->next = temp;
-//        }
-//    } else {
-//        printf("rifiutato\n");
-//    }
-//
-//    return head;
-//}
-//
+
 ////rimuovo il primo elemento, facendo si che venga deallocata la memoria
 //// coda_ordini* rimuovi_primo_ordine_completo(coda_ordini* head){
 ////     coda_ordini* temp;
@@ -1095,19 +902,3 @@ void insert_min_heap(ingredienteMinHeap* min_heap, heapNode node) {
 //        head = head->next;
 //    }
 //}
-//
-//
-//
-//
-//
-
-////1. Carretto -> coda ordini completi (salvando t a cui sono state completate, poi da stampare), in attesa di essere caricare sul carretto.
-////creare struct per ordine che ha nome ricetta e t di completamento, che è una lista puntata (coda)
-////2. Carretto -> carico degli ordini sul carretto, in ordine di peso
-////3. Rivedere rimozione ingrediente nel momento in cui si cucina una ricetta (con attenzione alla scadenza)
-////4. Main -> lettura stringa e chiamata funzione corretta
-////5. Funzioni varie -> aggiungere stampe corrette
-////6. Gestione del tempo -> incrementare variabile per ogni riga letta.
-////7. Coda per ordini in attesa -> creare coda per ordini in attesa di essere completati.
-////Ogni volta che arriva un ingrediente nuova, controllare se è possibile completare una ricetta in attesa.
-////creerei dei valori fuori dal main che sono i nostri riferimenti tipo quando passiamo le head delle code ecc
