@@ -82,7 +82,7 @@ int main(){
         return 1; // o un altro codice di errore
     }
     do{
-        stampa_coda_ordini(ordini_in_sospeso);
+        //stampa_coda_ordini(ordini_in_sospeso);
         if(t % tempo_carretto==0 && t != 0){
             spedisci_ordini(&ordini_completi,peso_carretto);
 //            printf("siamo al t = %d\n", t);
@@ -600,7 +600,7 @@ coda_ordini* inserisci_ordine_completo(coda_ordini* head, char* nome, int quanti
 }
 void spedisci_ordini(coda_ordini** ordini_completi, int peso_carretto) {
     if (*ordini_completi == NULL) {
-        printf("Camioncino vuoto\n");
+        printf("camioncino vuoto\n");
         return;
     }
 
@@ -618,7 +618,7 @@ void spedisci_ordini(coda_ordini** ordini_completi, int peso_carretto) {
     while (current != NULL) {
         if (current->peso_totale <= peso_carretto) {
             peso_carretto -= current->peso_totale;
-            printf("Peso ordine aggiunto: %d -> Peso rimanente: %d\n", current->peso_totale, peso_carretto);
+            //printf("Peso ordine aggiunto: %d -> Peso rimanente: %d\n", current->peso_totale, peso_carretto);
 
 
             // Rimuovi l'ordine dalla lista originale
