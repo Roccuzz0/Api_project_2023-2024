@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #define MAX_NAME 256
-#define MIN_HEAP_CAPACITY 100
-#define TABLE_SIZE 100
+#define MIN_HEAP_CAPACITY 10000
+#define TABLE_SIZE 10000
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFFUL)
-char buff[10000000];
+char buff[100000000];
 
 
 typedef struct heapNode {
@@ -82,6 +82,7 @@ int main(){
         return 1; // o un altro codice di errore
     }
     do{
+        stampa_coda_ordini(ordini_in_sospeso);
         if(t % tempo_carretto==0 && t != 0){
             spedisci_ordini(&ordini_completi,peso_carretto);
 //            printf("siamo al t = %d\n", t);
@@ -111,9 +112,9 @@ int main(){
 //            printf("\ncompleti:");
 //            stampa_coda_ordini(ordini_completi);
             prepara_ordine(&magazzino, t, &ordini_completi, &ordini_in_sospeso);
-            printf("\ncompleti:");
-            stampa_coda_ordini(ordini_completi);
-            print_magazzino(&magazzino);
+            //printf("\ncompleti:");
+            //stampa_coda_ordini(ordini_completi);
+            //print_magazzino(&magazzino);
         }else{
             break;
         }
@@ -617,6 +618,8 @@ void spedisci_ordini(coda_ordini** ordini_completi, int peso_carretto) {
     while (current != NULL) {
         if (current->peso_totale <= peso_carretto) {
             peso_carretto -= current->peso_totale;
+            printf("Peso ordine aggiunto: %d -> Peso rimanente: %d\n", current->peso_totale, peso_carretto);
+
 
             // Rimuovi l'ordine dalla lista originale
             if (prev == NULL) {
