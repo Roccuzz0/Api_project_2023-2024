@@ -2,10 +2,21 @@
 #include <stdlib.h>
 #include <string.h>
 #define MAX_NAME 256
-#define MIN_HEAP_CAPACITY 250
-#define TABLE_SIZE 250
+#define MIN_HEAP_CAPACITY 15
+#define TABLE_SIZE 101
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFFUL)
 char buff[100000];
+unsigned long hash_string(unsigned char *str) {
+    unsigned long hash = 3796;
+    int c;
+
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+    }
+
+    return hash % TABLE_SIZE;  // TABLE_SIZE dovrebbe essere la dimensione del tuo array di hash
+}
+
 
 
 typedef struct heapNode {
@@ -133,11 +144,11 @@ int main(){
         }else{
             break;
         }
-//        printf("coda ordini in sospeso:\n");
-//        stampa_coda_ordini(ordini_in_sospeso);
-//        printf("coda ordini completi:\n");
-//        stampa_coda_ordini(ordini_completi);
-//        print_magazzino(&magazzino);
+        printf("coda ordini in sospeso:\n");
+        stampa_coda_ordini(ordini_in_sospeso);
+        printf("coda ordini completi:\n");
+        stampa_coda_ordini(ordini_completi);
+        print_magazzino(&magazzino);
         t++;
     }while(1);
     return 0;
@@ -189,7 +200,7 @@ void print_magazzino(magazzinoHashTable* magazzino) {
     for (int i = 0; i < magazzino->size; i++) {
         ingredienteHashNode* current = magazzino->cells[i];
         if (current == NULL) {
-            printf("Cella %d: vuota\n", i);
+//            printf("Cella %d: vuota\n", i);
         } else {
             while (current != NULL) {
                 printf("Cella %d:\n", i);
@@ -324,15 +335,15 @@ void elimina_ricetta(char *nome_ricetta, coda_ordini *ordini_sospesi) {
     }
 }
 void rifornimento(magazzinoHashTable* magazzino, char* string, int tempo) {
-    char* ingrediente = strtok(string, " ");
+    char* ingrediente = strdup(strtok(string, " "));
     while (ingrediente != NULL) {
         int peso_ingrediente = atoi(strtok(NULL, " "));
         int scadenza_ingrediente = atoi(strtok(NULL, " "));
-        int index = hash(ingrediente);
+        int index = hash_string(ingrediente);
         ingredienteHashNode* ingrediente_node;
         int trovato = 0;
         for (int i = 0; i < TABLE_SIZE; i++) {
-            int try = (i + index) % TABLE_SIZE;
+            int try = (i*i + index) % TABLE_SIZE;
             if (magazzino->cells[try]==NULL || strcmp(magazzino->cells[try]->nome,ingrediente)==0) {
                 ingrediente_node = magazzino->cells[try];
                 //printf("%s %d\n",ingrediente,try);
@@ -535,7 +546,7 @@ coda_risultato prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda
         // Verifica se gli ingredienti sono disponibili
         while (ingrediente_corrente != NULL) {
             int quantita_richiesta = quantita * ingrediente_corrente->peso;
-            ingredienteHashNode* nodo_ingrediente = magazzino->cells[hash(ingrediente_corrente->nome)];
+            ingredienteHashNode* nodo_ingrediente = magazzino->cells[hash_string(ingrediente_corrente->nome)];
 
             if (!nodo_ingrediente) {
                 ingredienti_disponibili = 0;
@@ -564,7 +575,7 @@ coda_risultato prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda
             ingrediente_corrente = ricetta->ingredienti;
             while (ingrediente_corrente != NULL) {
                 int quantita_richiesta = quantita * ingrediente_corrente->peso;
-                ingredienteHashNode* nodo_ingrediente = magazzino->cells[hash(ingrediente_corrente->nome)];
+                ingredienteHashNode* nodo_ingrediente = magazzino->cells[hash_string(ingrediente_corrente->nome)];
 
                 while (quantita_richiesta > 0) {
                     if (nodo_ingrediente->min_heap.size == 0) {
