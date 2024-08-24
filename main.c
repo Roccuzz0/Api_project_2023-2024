@@ -2,18 +2,17 @@
 #include <stdlib.h>
 #include <string.h>
 #define MAX_NAME 256
-#define MIN_HEAP_CAPACITY 15
+#define MIN_HEAP_CAPACITY 20
 #define TABLE_SIZE 101
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFFUL)
 char buff[100000];
-unsigned long hash_string(unsigned char *str) {
+unsigned long hash_string(char *str) {
     unsigned long hash = 3796;
     int c;
 
     while ((c = *str++)) {
-        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+        hash = ((hash << 5) + hash) + c;
     }
-
     return hash % TABLE_SIZE;  // TABLE_SIZE dovrebbe essere la dimensione del tuo array di hash
 }
 
@@ -112,7 +111,7 @@ int main(){
 //            printf("siamo al t = %d\n", t);
         }
         char *result = fgets(buff, sizeof(buff), stdin);
-        (void)result;  // sopprimo il warning per la variabile non utilizzata
+        (void)result;
         char* token = strtok(buff," ");//informazione sul comando da fare
         char* funz = strtok(NULL, "");//ottengo il resto della riga
         //printf("siamo al t = %d\n", t);
@@ -144,11 +143,11 @@ int main(){
         }else{
             break;
         }
-        printf("coda ordini in sospeso:\n");
-        stampa_coda_ordini(ordini_in_sospeso);
-        printf("coda ordini completi:\n");
-        stampa_coda_ordini(ordini_completi);
-        print_magazzino(&magazzino);
+//        printf("coda ordini in sospeso:\n");
+//        stampa_coda_ordini(ordini_in_sospeso);
+//        printf("coda ordini completi:\n");
+//        stampa_coda_ordini(ordini_completi);
+//        print_magazzino(&magazzino);
         t++;
     }while(1);
     return 0;
@@ -158,7 +157,7 @@ void print_table() {
     printf("Start\n");
     for (int i = 0; i < TABLE_SIZE; ++i) {
         if (ricette_hash_table[i] == NULL) {
-            printf("\t%i\t---\n", i);
+            //printf("\t%i\t---\n", i);
         } else if (ricette_hash_table[i] == DELETED_NODE) {
             printf("\t%i\t---<deleted>\n", i);
         } else {
@@ -189,12 +188,17 @@ unsigned int hash(char *ricetta) {
 }
 void init_magazzino(magazzinoHashTable* magazzino, int size) {
     magazzino->size = size;
-    magazzino->cells = (ingredienteHashNode**)calloc(size, sizeof(ingredienteHashNode*));
+    magazzino->cells = (ingredienteHashNode**)malloc(size * sizeof(ingredienteHashNode*));
     if (magazzino->cells == NULL) {
         perror("Errore di allocazione memoria per magazzino");
         exit(EXIT_FAILURE);
     }
+    // Inizializza gli elementi a NULL
+    for (int i = 0; i < size; i++) {
+        magazzino->cells[i] = NULL;
+    }
 }
+
 void print_magazzino(magazzinoHashTable* magazzino) {
     printf("Stampa magazzino:\n");
     for (int i = 0; i < magazzino->size; i++) {
@@ -343,11 +347,12 @@ void rifornimento(magazzinoHashTable* magazzino, char* string, int tempo) {
         ingredienteHashNode* ingrediente_node;
         int trovato = 0;
         for (int i = 0; i < TABLE_SIZE; i++) {
-            int try = (i*i + index) % TABLE_SIZE;
-            if (magazzino->cells[try]==NULL || strcmp(magazzino->cells[try]->nome,ingrediente)==0) {
+            int try = (i + index) % TABLE_SIZE;
+            if (magazzino->cells[try] == NULL || strcmp(magazzino->cells[try]->nome,ingrediente)==0) {
                 ingrediente_node = magazzino->cells[try];
                 //printf("%s %d\n",ingrediente,try);
                 trovato = 1;
+                index = try;
                 break;
             }
         }
@@ -518,7 +523,6 @@ void stampa_coda_ordini(coda_ordini* ordini_in_sospeso) {
         current = current->next;
     }
 }
-// Funzione aggiornata
 coda_risultato prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda_ordini* ordini_completi, coda_ordini* ordini_in_sospeso) {
     coda_risultato risultato = {ordini_completi, ordini_in_sospeso };
 
@@ -726,8 +730,7 @@ void spedisci_ordini(coda_ordini** ordini_completi, int peso_carretto) {
             current = current->next;
             prev_temp->next = NULL; // Fine della lista temporanea
         } else {
-            prev = current;
-            current = current->next;
+            break;
         }
     }
 
