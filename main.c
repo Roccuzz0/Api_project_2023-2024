@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 #define MAX_NAME 256
-#define MIN_HEAP_CAPACITY 20
-#define TABLE_SIZE 101
+#define MIN_HEAP_CAPACITY 15
+#define TABLE_SIZE 150
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFFUL)
 char buff[100000];
 unsigned long hash_string(char *str) {
-    unsigned long hash = 3796;
+    unsigned long hash = 5381;
     int c;
 
     while ((c = *str++)) {
@@ -62,6 +62,7 @@ ricetta *ricette_hash_table[TABLE_SIZE];
 void print_magazzino(magazzinoHashTable* magazzino);
 void init_magazzino(magazzinoHashTable* magazzino, int size);
 void print_table();
+unsigned int hash(char *ricetta);
 void init_hash();
 ricetta* cerca_ricetta(char *nome_ricetta);
 void aggiungi_ricetta(char* funz);
@@ -77,7 +78,7 @@ coda_ordini* crea_ordine();
 void stampa_coda_ordini(coda_ordini* ordini_in_sospeso);
 heapNode extract_min(ingredienteMinHeap* min_heap);
 coda_risultato prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda_ordini* ordini_completi, coda_ordini* ordini_in_sospeso);
-void remove_expired_from_heap(ingredienteMinHeap* min_heap, int current_time);
+void remove_expired_from_heap(ingredienteHashNode* nodo, int current_time);
 coda_ordini* inserisci_ordine_completo(coda_ordini* head, char* nome, int quantita, int tempo, int peso);
 void spedisci_ordini(coda_ordini** ordini_completi, int peso);
 coda_ordini* ordina_per_peso(coda_ordini* head);
@@ -234,7 +235,7 @@ void aggiungi_ricetta(char* funz) {
     }
     ricetta* r = crea_ricetta(nome_ricetta, funz);
     // Calcola l'indice iniziale
-    int index = hash(r->nome);
+    int index = hash_string(r->nome);
     // Usa il probing per trovare una cella disponibile
     for (int i = 0; i < TABLE_SIZE; i++) {
         // Calcola il prossimo indice da provare
@@ -255,7 +256,7 @@ void aggiungi_ricetta(char* funz) {
 ricetta *cerca_ricetta(char *nome_ricetta){
 //    printf("%d\n", hash(nome_ricetta));
 //    printf("%s\n",nome_ricetta);
-    int index = hash(nome_ricetta);
+    int index = hash_string(nome_ricetta);
     for (int i = 0; i < TABLE_SIZE; i++) {
         int try = (i + index) % TABLE_SIZE;
         if(ricette_hash_table[try]==NULL){
@@ -312,8 +313,8 @@ coda_ingredienti * crea_ingrediente(){
 
 void elimina_ricetta(char *nome_ricetta, coda_ordini *ordini_sospesi) {
     char* nome = strtok(nome_ricetta," ");
-    trim_trailing_whitespace(nome);
-    int index = hash(nome);
+    trim_trailing_whitespace(nome_ricetta);
+    int index = hash_string(nome);
     // Controlla se la ricetta è presente negli ordini sospesi
     coda_ordini *current_ordine = ordini_sospesi;
     while (current_ordine != NULL) {
@@ -343,6 +344,10 @@ void rifornimento(magazzinoHashTable* magazzino, char* string, int tempo) {
     while (ingrediente != NULL) {
         int peso_ingrediente = atoi(strtok(NULL, " "));
         int scadenza_ingrediente = atoi(strtok(NULL, " "));
+        if(scadenza_ingrediente<=tempo || peso_ingrediente <= 0){
+            ingrediente=strdup(strtok(NULL, " ")) ;
+            continue;
+        }
         int index = hash_string(ingrediente);
         ingredienteHashNode* ingrediente_node;
         int trovato = 0;
@@ -360,6 +365,7 @@ void rifornimento(magazzinoHashTable* magazzino, char* string, int tempo) {
             printf("ho finito gli spazi nel magazzino\n");
             return;
         }
+
         // Se non esiste il nodo, lo crea e setta tutto a zero
         if (ingrediente_node == NULL) {
             // Creazione del nuovo nodo se l'ingrediente non è trovato
@@ -374,16 +380,17 @@ void rifornimento(magazzinoHashTable* magazzino, char* string, int tempo) {
         }
 
         // Rimuovi gli elementi scaduti prima di aggiungere nuovi elementi
-        remove_expired_from_heap(&ingrediente_node->min_heap, tempo);
+        remove_expired_from_heap(ingrediente_node, tempo);
 
         // Aggiorna il peso totale
         ingrediente_node->total_weight += peso_ingrediente;
 
         // Inserisci il nuovo nodo nel min heap
+
         heapNode new_node = { .expiry = scadenza_ingrediente, .weight = peso_ingrediente };
         insert_min_heap(&ingrediente_node->min_heap, new_node);
 
-        ingrediente = strtok(NULL, " ");
+        ingrediente = strdup(strtok(NULL, " "));
     }
     printf("rifornito\n");
 }
@@ -411,21 +418,17 @@ void min_heapify(ingredienteMinHeap* min_heap, int index) {
 //     for (int i = 0; i < min_heap->size; i++) {
 //         printf("Node %d: Expiry: %d, Weight: %d\n", i, min_heap->nodes[i].expiry, min_heap->nodes[i].weight);
 //     }
-
     // Check if the left child exists and is smaller than the current node
     if (left < min_heap->size && min_heap->nodes[left].expiry < min_heap->nodes[smallest].expiry) {
         smallest = left;
     }
-
     // Check if the right child exists and is smaller than the current smallest node
     if (right < min_heap->size && min_heap->nodes[right].expiry < min_heap->nodes[smallest].expiry) {
         smallest = right;
     }
-
     // If the smallest node is not the current node, swap and continue heapifying
     if (smallest != index) {
         swap_node(&min_heap->nodes[smallest], &min_heap->nodes[index]);
-
         // Recursively heapify the affected subtree
         min_heapify(min_heap, smallest);
     }
@@ -463,7 +466,7 @@ coda_ordini* inserisci_ordine_in_sospeso(coda_ordini* ordini_in_sospeso, char* s
     char* nome = strtok(strdup(string), " ");
     int quantita = atoi(strtok(NULL, " "));
     // Verifica se la ricetta è presente nella hash map
-    int index = hash(nome);
+    int index = hash_string(nome);
     int ricetta_trovata = 0;
     for (int i = 0; i < TABLE_SIZE; i++) {
         int try = (i + index) % TABLE_SIZE;
@@ -558,7 +561,7 @@ coda_risultato prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda
             }
 
             // Rimuovi gli ingredienti scaduti
-            remove_expired_from_heap(&nodo_ingrediente->min_heap, curr_time);
+            remove_expired_from_heap(nodo_ingrediente, curr_time);
 
             // Verifica se ci sono abbastanza ingredienti
             int peso_disponibile = 0;
@@ -652,12 +655,13 @@ heapNode extract_min(ingredienteMinHeap* min_heap) {
 
     return root;
 }
-void remove_expired_from_heap(ingredienteMinHeap* min_heap, int current_time) {
+void remove_expired_from_heap(ingredienteHashNode* nodo, int current_time) {
     // Continue removing the root as long as it is expired or has an expiry of 0
-    while (min_heap->size > 0 &&
-           (min_heap->nodes[0].expiry <= current_time || min_heap->nodes[0].expiry == 0)) {
+    while (nodo->min_heap.size > 0 &&
+           (nodo->min_heap.nodes[0].expiry <= current_time || nodo->min_heap.nodes[0].expiry == 0)) {
         // Extract the minimum element (root) and ignore it (since it's expired)
-        extract_min(min_heap);
+        heapNode resto = extract_min(&nodo->min_heap);
+        nodo->total_weight -= resto.weight;
     }
 }
 
