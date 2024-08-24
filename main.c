@@ -353,7 +353,7 @@ void rifornimento(magazzinoHashTable* magazzino, char* string, int tempo) {
         int peso_ingrediente = atoi(strtok(NULL, " "));
         int scadenza_ingrediente = atoi(strtok(NULL, " "));
         if(scadenza_ingrediente<=tempo || peso_ingrediente <= 0){
-            ingrediente=strdup(strtok(NULL, " ")) ;
+            ingrediente=strtok(NULL, " ");
             continue;
         }
         int index = hash_string(ingrediente);
@@ -398,7 +398,7 @@ void rifornimento(magazzinoHashTable* magazzino, char* string, int tempo) {
         heapNode new_node = { .expiry = scadenza_ingrediente, .weight = peso_ingrediente };
         insert_min_heap(&ingrediente_node->min_heap, new_node);
 
-        ingrediente = strdup(strtok(NULL, " "));
+        ingrediente = strtok(NULL, " ");
     }
     printf("rifornito\n");
 }
