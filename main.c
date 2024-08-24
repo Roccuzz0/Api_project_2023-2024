@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #define MAX_NAME 256
-#define MIN_HEAP_CAPACITY 15
-#define TABLE_SIZE 150
+#define MIN_HEAP_CAPACITY 10000
+#define TABLE_SIZE 1000000
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFFUL)
-char buff[100000];
+char buff[1000000];
 unsigned long hash_string(char *str) {
     unsigned long hash = 5381;
     int c;
@@ -115,7 +115,12 @@ int main(){
         (void)result;
         char* token = strtok(buff," ");//informazione sul comando da fare
         char* funz = strtok(NULL, "");//ottengo il resto della riga
+        //printf("Token: '%s', Funz: '%s'\n", token, funz);
         //printf("siamo al t = %d\n", t);
+    
+        if(funz == NULL){
+            break;
+        }
         if(strcmp(token,"aggiungi_ricetta")==0){
             aggiungi_ricetta(funz);
             //print_table();
@@ -141,9 +146,8 @@ int main(){
 //            printf("\ncompleti:");
 //            stampa_coda_ordini(ordini_completi);
 //            print_magazzino(&magazzino);
-        }else{
-            break;
         }
+
 //        printf("coda ordini in sospeso:\n");
 //        stampa_coda_ordini(ordini_in_sospeso);
 //        printf("coda ordini completi:\n");
