@@ -69,7 +69,7 @@ void aggiungi_ricetta(char* funz);
 ricetta *crea_ricetta(char* nome_ricetta, char *funz);
 coda_ingredienti* inserisci_ingrediente(coda_ingredienti * head, char* nome, int peso);
 coda_ingredienti * crea_ingrediente();
-void elimina_ricetta(char *nome,coda_ordini *ordini_sospesi);
+void elimina_ricetta(char *nome,coda_ordini *ordini_sospesi,coda_ordini* ordini_completi);
 void rifornimento(magazzinoHashTable* magazzino, char* string,int tempo);
 void insert_min_heap(ingredienteMinHeap* min_heap, heapNode node);
 void trim_trailing_whitespace(char* str);
@@ -121,7 +121,7 @@ int main(){
             //print_table();
         }
         else if(strcmp(token,"rimuovi_ricetta")==0){
-            elimina_ricetta(funz, ordini_in_sospeso);
+            elimina_ricetta(funz, ordini_in_sospeso,ordini_completi);
         }
         else if(strcmp(token,"rifornimento")==0){
             rifornimento(&magazzino,funz,t);
@@ -311,12 +311,20 @@ coda_ingredienti * crea_ingrediente(){
     return temp;
 }
 
-void elimina_ricetta(char *nome_ricetta, coda_ordini *ordini_sospesi) {
+void elimina_ricetta(char *nome_ricetta, coda_ordini *ordini_sospesi,coda_ordini* ordini_completi) {
     char* nome = strtok(nome_ricetta," ");
     trim_trailing_whitespace(nome_ricetta);
     int index = hash_string(nome);
     // Controlla se la ricetta è presente negli ordini sospesi
     coda_ordini *current_ordine = ordini_sospesi;
+    while (current_ordine != NULL) {
+        if (strcmp(nome, current_ordine->nome_ricetta) == 0) {
+            printf("ordini in sospeso\n");
+            return;
+        }
+        current_ordine = current_ordine->next;
+    }
+    current_ordine = ordini_completi;
     while (current_ordine != NULL) {
         if (strcmp(nome, current_ordine->nome_ricetta) == 0) {
             printf("ordini in sospeso\n");
@@ -542,12 +550,6 @@ coda_risultato prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda
         int tempo_richiesta = curr->tempo_richiesta;
         ricetta* ricetta = cerca_ricetta(nome_ricetta);
 
-        if (!ricetta) {
-            prec = curr;
-            curr = curr->next;
-            continue;
-        }
-
         int ingredienti_disponibili = 1;
         coda_ingredienti* ingrediente_corrente = ricetta->ingredienti;
         // Verifica se gli ingredienti sono disponibili
@@ -563,13 +565,7 @@ coda_risultato prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda
             // Rimuovi gli ingredienti scaduti
             remove_expired_from_heap(nodo_ingrediente, curr_time);
 
-            // Verifica se ci sono abbastanza ingredienti
-            int peso_disponibile = 0;
-            for (int i = 0; i < nodo_ingrediente->min_heap.size; i++) {
-                peso_disponibile += nodo_ingrediente->min_heap.nodes[i].weight;
-            }
-
-            if (peso_disponibile < quantita_richiesta) {
+            if (nodo_ingrediente->total_weight < quantita_richiesta) {
                 ingredienti_disponibili = 0;
                 break;
             }
@@ -585,9 +581,6 @@ coda_risultato prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda
                 ingredienteHashNode* nodo_ingrediente = magazzino->cells[hash_string(ingrediente_corrente->nome)];
 
                 while (quantita_richiesta > 0) {
-                    if (nodo_ingrediente->min_heap.size == 0) {
-                        break;
-                    }
 
                     heapNode min_node = extract_min(&nodo_ingrediente->min_heap);
 
@@ -616,14 +609,13 @@ coda_risultato prepara_ordine(magazzinoHashTable* magazzino, int curr_time, coda
                 ingrediente_corrente = ingrediente_corrente->next;
             }
             risultato.ordini_completi = inserisci_ordine_completo(risultato.ordini_completi, nome_ricetta, quantita, tempo_richiesta, peso_totale);
-
+            //printf("ordine completato: %s\n",nome_ricetta);
             // Rimozione dell'ordine corrente dalla lista
             if (prec) {
                 prec->next = curr->next;
             } else {
                 risultato.ordini_in_sospeso = curr->next;
             }
-
             coda_ordini* temp = curr;
             curr = curr->next;
             free(temp->nome_ricetta);
