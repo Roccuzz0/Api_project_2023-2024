@@ -3,7 +3,7 @@
 #include <string.h>
 #define MAX_NAME 256
 #define MIN_HEAP_CAPACITY 100
-#define TABLE_SIZE 148583
+#define TABLE_SIZE 10000
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFFUL)
 int collisioni = 0;
 char buff[10000];
@@ -56,7 +56,6 @@ typedef struct coda_ordini_in_sospeso{
     ricetta* ricetta;
     int quantita;
     int tempo_richiesta;//tempo in cui vengono richiesti,mi è sembrato di capire che non dobbiamo stampare quando vengono completati
-    int peso_totale;
     struct coda_ordini_in_sospeso* next;
 }coda_ordini_in_sospeso;
 typedef struct coda_risultato{
@@ -83,7 +82,8 @@ void insert_min_heap(ingredienteMinHeap* min_heap, heapNode node);
 void trim_trailing_whitespace(char* str);
 coda_ordini_in_sospeso* inserisci_ordine_in_sospeso(coda_ordini_in_sospeso * ordini_in_sospeso, coda_ordini_in_sospeso* temp);
 coda_ordini* crea_ordine();
-void stampa_coda_ordini(coda_ordini_in_sospeso* ordini_in_sospeso);
+void stampa_coda_ordini(coda_ordini* ordini_completi);
+void stampa_coda_ordini_in_sospeso(coda_ordini_in_sospeso* ordiniInSospeso);
 heapNode extract_min(ingredienteMinHeap* min_heap);
 coda_risultato prepara_ordine(ingredienteHashNode** magazzino, int curr_time, coda_ordini* ordini_completi, coda_ordini_in_sospeso* ordini_in_sospeso);
 void remove_expired_from_heap(ingredienteHashNode* nodo, int current_time);
@@ -153,10 +153,10 @@ int main(){
 //            print_magazzino(&magazzino);
         }
 //        printf("coda ordini in sospeso:\n");
-//        stampa_coda_ordini(ordini_in_sospeso);
+//        stampa_coda_ordini_in_sospeso(ordini_in_sospeso);
 //        printf("coda ordini completi:\n");
 //        stampa_coda_ordini(ordini_completi);
-//        print_magazzino(&magazzino);
+        //print_magazzino(&magazzino);
         t++;
     }while(1);
     printf("%d", collisioni);
@@ -426,12 +426,12 @@ void elimina_ricetta(char *nome_ricetta, coda_ordini_in_sospeso *ordini_sospesi,
         current_ordine = current_ordine->next;
     }
     coda_ordini* curr = ordini_completi;
-    while (current_ordine != NULL) {
-        if (strcmp(nome, curr->nome_ricetta) == 0) {
+    while (curr != NULL) {
+        if (strcmp(nome, strdup(curr->nome_ricetta)) == 0) {
             printf("ordini in sospeso\n");
             return;
         }
-        current_ordine = current_ordine->next;
+        curr = curr->next;
     }
     // Cerca e cancella la ricetta dalla tabella hash
     for (int i = 0; i < TABLE_SIZE; i++) {
@@ -592,14 +592,25 @@ coda_ordini* crea_ordine() {
     temp->next = NULL;
     return temp;
 }
-void stampa_coda_ordini(coda_ordini_in_sospeso * ordini_in_sospeso) {
-    if (ordini_in_sospeso == NULL) {
+void stampa_coda_ordini_in_sospeso(coda_ordini_in_sospeso* ordiniInSospeso){
+    if (ordiniInSospeso == NULL) {
         printf("La coda degli ordini e' vuota.\n");
         return;
     }
-    coda_ordini_in_sospeso * current = ordini_in_sospeso;
+    coda_ordini_in_sospeso* current = ordiniInSospeso;
     while (current != NULL) {
         printf("Ordine: %s, Quantita: %d, Tempo di richiesta: %d\n",current->ricetta->nome, current->quantita, current->tempo_richiesta);
+        current = current->next;
+    }
+}
+void stampa_coda_ordini(coda_ordini* ordini_completi) {
+    if (ordini_completi == NULL) {
+        printf("La coda degli ordini e' vuota.\n");
+        return;
+    }
+    coda_ordini * current = ordini_completi;
+    while (current != NULL) {
+        printf("Ordine: %s, Quantita: %d, Tempo di richiesta: %d\n",current->nome_ricetta, current->quantita, current->tempo_richiesta);
         current = current->next;
     }
 }
@@ -614,6 +625,7 @@ coda_risultato prepara_ordine(ingredienteHashNode** magazzino, int curr_time, co
     coda_ordini_in_sospeso * prec = NULL;
 
     while (curr != NULL) {
+        char* nome = curr->ricetta->nome;
         int quantita = curr->quantita;
         int tempo_richiesta = curr->tempo_richiesta;
         int ingredienti_disponibili = 1;
@@ -674,7 +686,7 @@ coda_risultato prepara_ordine(ingredienteHashNode** magazzino, int curr_time, co
                 peso_totale += quantita * ingrediente_corrente->peso;
                 ingrediente_corrente = ingrediente_corrente->next;
             }
-            risultato.ordini_completi = inserisci_ordine_completo(risultato.ordini_completi, curr->ricetta->nome, quantita, tempo_richiesta, peso_totale);
+            risultato.ordini_completi = inserisci_ordine_completo(risultato.ordini_completi, nome, quantita, tempo_richiesta, peso_totale);
             //printf("ordine completato: %s\n",nome_ricetta);
             // Rimozione dell'ordine corrente dalla lista
             if (prec) {
