@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
+//#include <stdbool.h>
 
-#define MIN_HEAP_CAPACITY 100
-#define TABLE_SIZE 25323
+#define MIN_HEAP_CAPACITY 950
+#define TABLE_SIZE 25383
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFUL)
-char buff[25000];
+char buff[6000];
 
 typedef struct heapNode {
     int expiry;
@@ -45,14 +45,14 @@ typedef struct coda_ordini_in_sospeso{
     int tempo_richiesta;
     struct coda_ordini_in_sospeso* next;
 }coda_ordini_in_sospeso;
-typedef struct lista_ricetta_infattibile {
-    struct ricetta* ricetta;
-    int quantita;
-    struct lista_ricetta_infattibile* next;
-} lista_ricetta_infattibile;
+//typedef struct lista_ricetta_infattibile {
+//    struct ricetta* ricetta;
+//    int quantita;
+//    struct lista_ricetta_infattibile* next;
+//} lista_ricetta_infattibile;
 ricetta* ricette_hash_table[TABLE_SIZE] = {NULL};
 ingredienteHashNode* magazzino[TABLE_SIZE] = {NULL};
-lista_ricetta_infattibile* ric_inf = {NULL};
+//lista_ricetta_infattibile* ric_inf = {NULL};
 coda_ordini_completi* head_ordini_completi = NULL;
 coda_ordini_completi* tail_ordini_completi = NULL;
 coda_ordini_in_sospeso* head_ordini_in_sospeso = NULL;
@@ -144,23 +144,23 @@ void singolo_ordine(int tempo, char* funz) {
         return;
     }
     printf("accettato\n");
-    lista_ricetta_infattibile* ric_inf_corrente = ric_inf;
-    while(ric_inf_corrente!=NULL){
-        if(ric_inf_corrente->ricetta == ric && ric_inf_corrente->quantita <= quantita){
-            coda_ordini_in_sospeso * temp;
-            temp = (coda_ordini_in_sospeso*)malloc(sizeof(coda_ordini_in_sospeso));
-            if (temp == NULL) {
-                return;
-            }
-            temp->ricetta = ric;
-            temp->quantita = quantita;
-            temp->tempo_richiesta = tempo;
-            temp->next = NULL;
-            inserisci_ordine_in_sospeso(temp);
-            return;
-        }
-        ric_inf_corrente=ric_inf_corrente->next;
-    }
+//    lista_ricetta_infattibile* ric_inf_corrente = ric_inf;
+//    while(ric_inf_corrente!=NULL){
+//        if(ric_inf_corrente->ricetta == ric && ric_inf_corrente->quantita <= quantita){
+//            coda_ordini_in_sospeso * temp;
+//            temp = (coda_ordini_in_sospeso*)malloc(sizeof(coda_ordini_in_sospeso));
+//            if (temp == NULL) {
+//                return;
+//            }
+//            temp->ricetta = ric;
+//            temp->quantita = quantita;
+//            temp->tempo_richiesta = tempo;
+//            temp->next = NULL;
+//            inserisci_ordine_in_sospeso(temp);
+//            return;
+//        }
+//        ric_inf_corrente=ric_inf_corrente->next;
+//    }
     int ingredienti_disponibili = 1;
     coda_ingredienti* ingrediente_corrente = ric->ingredienti;
     while (ingrediente_corrente != NULL) {
@@ -469,27 +469,27 @@ void prepara_ordine(int curr_time) {
     if (head_ordini_in_sospeso == NULL) {
         return ;
     }
-    lista_ricetta_infattibile* infattibili = (lista_ricetta_infattibile*) malloc(sizeof (lista_ricetta_infattibile));
-    if (infattibili == NULL) {
-        return;
-    }
-    ric_inf=NULL;
+//    lista_ricetta_infattibile* infattibili = (lista_ricetta_infattibile*) malloc(sizeof (lista_ricetta_infattibile));
+//    if (infattibili == NULL) {
+//        return;
+//    }
+//    ric_inf=NULL;
 
     coda_ordini_in_sospeso *curr = head_ordini_in_sospeso;
     coda_ordini_in_sospeso *prec = NULL;
-    bool infat = false;
+    //bool infat = false;
     while (curr != NULL) {
-            while (ric_inf != NULL) {
-                if (ric_inf->ricetta == curr->ricetta && ric_inf->quantita <= curr->quantita) {
-                    infat = true;
-                    break;
-                }
-                ric_inf = ric_inf->next;
-            }
-        if (infat) {
-            curr = curr->next;
-            continue;
-        }
+//            while (ric_inf != NULL) {
+//                if (ric_inf->ricetta == curr->ricetta && ric_inf->quantita <= curr->quantita) {
+//                    infat = true;
+//                    break;
+//                }
+//                ric_inf = ric_inf->next;
+//            }
+//        if (infat) {
+//            curr = curr->next;
+//            continue;
+//        }
         int quantita = curr->quantita;
         int tempo_richiesta = curr->tempo_richiesta;
         int ingredienti_disponibili = 1;
@@ -509,22 +509,22 @@ void prepara_ordine(int curr_time) {
             }
             ingrediente_corrente = ingrediente_corrente->next;
         }
-        if (!ingredienti_disponibili) {
-            if(ric_inf==NULL){
-                infattibili->ricetta = curr->ricetta;
-                infattibili->quantita = curr->quantita;
-                infattibili->next = ric_inf;
-                ric_inf = infattibili;
-            }else{
-                while(ric_inf!=NULL){
-                    if(ric_inf->ricetta==curr->ricetta){
-                        ric_inf->quantita=curr->quantita;
-                        break;
-                    }
-                    ric_inf=ric_inf->next;
-                }
-            }
-        }
+//        if (!ingredienti_disponibili) {
+//            if(ric_inf==NULL){
+//                infattibili->ricetta = curr->ricetta;
+//                infattibili->quantita = curr->quantita;
+//                infattibili->next = ric_inf;
+//                ric_inf = infattibili;
+//            }else{
+//                while(ric_inf!=NULL){
+//                    if(ric_inf->ricetta==curr->ricetta){
+//                        ric_inf->quantita=curr->quantita;
+//                        break;
+//                    }
+//                    ric_inf=ric_inf->next;
+//                }
+//            }
+//        }
         if (ingredienti_disponibili) {
             int peso_totale = 0;
             ingrediente_corrente = curr->ricetta->ingredienti;
