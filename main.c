@@ -263,35 +263,32 @@ ricetta *crea_ricetta(char nome_ricetta[NAME]){
     return nuova_ricetta;
 }
 
-coda_ingredienti* inserisci_ingrediente(coda_ingredienti* head, char nome[NAME], int peso){
-    coda_ingredienti* temp;
-    int i = 0;
-    temp = crea_ingrediente();
+coda_ingredienti* inserisci_ingrediente(coda_ingredienti* head, char nome[NAME], int peso) {
     int index = hash_string(nome, TABLE_SIZE);
-    while(i<TABLE_SIZE) {
+    ingredienteHashNode *ingrediente_node = NULL;
+    for (int i = 0; i < TABLE_SIZE; i++) {
         int try = (index + i) % TABLE_SIZE;
         if (magazzino[try] == NULL) {
-            ingredienteHashNode *ingrediente_node = (ingredienteHashNode*)malloc(sizeof(ingredienteHashNode));
-            strcpy(ingrediente_node->nome,nome);
+            ingrediente_node = (ingredienteHashNode*)malloc(sizeof(ingredienteHashNode));
+            strcpy(ingrediente_node->nome, nome);
             ingrediente_node->total_weight = 0;
-            ingrediente_node->head = (nodo_coda*)malloc(sizeof (nodo_coda));
+            ingrediente_node->head = NULL;
             ingrediente_node->index_table = try;
             magazzino[try] = ingrediente_node;
-            temp->ingrediente = ingrediente_node;
             break;
-        }else if(strcmp(nome, magazzino[try]->nome)==0){
-            temp->ingrediente = magazzino[try];
+        } else if (strcmp(nome, magazzino[try]->nome) == 0) {
+            ingrediente_node = magazzino[try];
             break;
         }
-        i++;
     }
+    coda_ingredienti* temp = (coda_ingredienti*)malloc(sizeof(coda_ingredienti));
+    temp->ingrediente = ingrediente_node;
     temp->peso = peso;
-    if(head != NULL){
-        temp->next = head;
-    }
+    temp->next = head;
     head = temp;
     return head;
 }
+
 
 coda_ingredienti * crea_ingrediente(){
     coda_ingredienti * temp;
