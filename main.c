@@ -5,7 +5,7 @@
 #define TABLE_SIZE 1003
 #define RICETTE_SIZE 24893
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFUL)
-char buff[6000];
+char buff[3223];
 
 typedef struct nodo_coda {
     int expiry;
@@ -138,7 +138,7 @@ void singolo_ordine(int tempo, char* funz) {
     printf("accettato\n");
     int ingredienti_disponibili = 1;
     coda_ingredienti* ingrediente_corrente = ric->ingredienti;
-    while (ingrediente_corrente != NULL) {
+    while (ingrediente_corrente) {
         int quantita_richiesta = quantita * ingrediente_corrente->peso;
         ingredienteHashNode* nodo_ingrediente = magazzino[hash_string(ingrediente_corrente->ingrediente->nome,TABLE_SIZE)];
         if (!nodo_ingrediente) {
@@ -154,7 +154,7 @@ void singolo_ordine(int tempo, char* funz) {
     }
     if (ingredienti_disponibili) {
         ingrediente_corrente = ric->ingredienti;
-        while (ingrediente_corrente != NULL) {
+        while (ingrediente_corrente) {
             int quantita_richiesta = quantita * ingrediente_corrente->peso;
             ingredienteHashNode* nodo_ingrediente = magazzino[hash_string(ingrediente_corrente->ingrediente->nome,TABLE_SIZE)];
             rimuovi_ingredienti_per_ordine(nodo_ingrediente,quantita_richiesta);
@@ -162,7 +162,7 @@ void singolo_ordine(int tempo, char* funz) {
         }
         int peso_totale = 0;
         ingrediente_corrente = ric->ingredienti;
-        while (ingrediente_corrente != NULL) {
+        while (ingrediente_corrente) {
             peso_totale += quantita * ingrediente_corrente->peso;
             ingrediente_corrente = ingrediente_corrente->next;
         }
@@ -214,7 +214,7 @@ void rimuovi_ingredienti_per_ordine(ingredienteHashNode* nodo_ingrediente, int q
 
 void aggiungi_ricetta(char* funz) {
     char* nome_ricetta = strtok(funz," ");
-    if(cerca_ricetta(nome_ricetta)!=NULL){
+    if(cerca_ricetta(nome_ricetta)){
         printf("ignorato\n");
         return;
     }
@@ -272,7 +272,7 @@ ricetta *crea_ricetta(char* nome_ricetta){
     int peso = atoi(token);
     head = inserisci_ingrediente(head, nome_ingrediente, peso);
     token = strtok(NULL, " ");
-    while(token != NULL){
+    while(token ){
         nome_ingrediente = token;
         token = strtok(NULL, " ");
         peso = atoi(token);
@@ -303,10 +303,14 @@ coda_ingredienti* inserisci_ingrediente(coda_ingredienti* head, char* nome, int 
 coda_ingredienti * crea_ingrediente(){
     coda_ingredienti * temp;
     temp = (coda_ingredienti *)malloc(sizeof(coda_ingredienti));
-    if(temp==NULL){
+    if(!temp){
         return NULL;
     }
     temp->ingrediente = (ingredienteHashNode*) malloc(sizeof (ingredienteHashNode));
+    if(!temp->ingrediente){
+        free(temp);
+        return NULL;
+    }
     temp->next = NULL;
     return temp;
 }
@@ -351,17 +355,17 @@ void rifornimento(char* string, int tempo) {
             int try = (index + i) % TABLE_SIZE;
             if (magazzino[try] == NULL) {
                 ingrediente_node = (ingredienteHashNode*)malloc(sizeof(ingredienteHashNode));
-                if (ingrediente_node == NULL) {
+                if (!ingrediente_node) {
                     return;
                 }
                 ingrediente_node->nome = strdup(ingrediente);
-                if (ingrediente_node->nome == NULL) {
+                if (!ingrediente_node->nome) {
                     free(ingrediente_node);
                     return;
                 }
                 ingrediente_node->total_weight = 0;
                 ingrediente_node->head = (nodo_coda*)malloc(sizeof (nodo_coda));
-                if(ingrediente_node->head==NULL){
+                if(!ingrediente_node->head){
                     free(ingrediente_node);
                     return;
                 }
@@ -459,7 +463,7 @@ void prepara_ordine(int curr_time) {
     }
     coda_ordini_in_sospeso *curr = head_ordini_in_sospeso;
     coda_ordini_in_sospeso *prec = NULL;
-    while (curr != NULL) {
+    while (curr ) {
         int quantita = curr->quantita;
         int tempo_richiesta = curr->tempo_richiesta;
         int ingredienti_disponibili = 1;
@@ -511,11 +515,11 @@ void prepara_ordine(int curr_time) {
 
 void inserisci_ordine_completo(char* nome, int quantita, int tempo, int peso) {
     coda_ordini_completi * temp = (coda_ordini_completi*) malloc(sizeof (coda_ordini_completi));
-    if(temp==NULL){
+    if(!temp){
         return;
     }
     temp->nome_ricetta = strdup(nome);
-    if(temp->nome_ricetta == NULL) {
+    if(!temp->nome_ricetta ) {
         free(temp);
         return;
     }
