@@ -43,7 +43,9 @@ typedef struct coda_ordini_in_sospeso{
     struct coda_ordini_in_sospeso* next;
 }coda_ordini_in_sospeso;
 
-ricetta* ricette_hash_table[RICETTE_SIZE] = {NULL};
+//ricetta* ricette_hash_table[RICETTE_SIZE] = {NULL};
+ricetta** ricette_hash_table;
+
 ingredienteHashNode* magazzino[TABLE_SIZE] = {NULL};
 coda_ordini_completi* head_ordini_completi = NULL;
 coda_ordini_completi* tail_ordini_completi = NULL;
@@ -72,6 +74,9 @@ void stampa_ordini(coda_ordini_completi * head);
 
 
 int main(){
+    ricette_hash_table = (ricetta**) calloc(RICETTE_SIZE, sizeof(ricetta*));
+
+
     int t = 0;
     int tempo_carretto,peso_carretto;
     if (scanf("%d %d\n", &tempo_carretto, &peso_carretto) != 2) {
@@ -121,7 +126,7 @@ void singolo_ordine(int tempo, char* funz) {
     int quantita = atoi(strtok(NULL, " "));
     int index = hash_string(nome, RICETTE_SIZE);
     int ricetta_trovata = 0;
-    struct ricetta* ric = NULL;
+    ricetta* ric = NULL;
     for (int i = 0; i < RICETTE_SIZE; i++) {
         int try = (i + index) % RICETTE_SIZE;
         if (ricette_hash_table[try] != NULL && ricette_hash_table[try] != DELETED_NODE) {
@@ -175,19 +180,7 @@ void singolo_ordine(int tempo, char* funz) {
         if (temp == NULL) {
             return;
         }
-        temp->ricetta = (ricetta*)malloc(sizeof(ricetta));
-        if (temp->ricetta == NULL) {
-            free(temp);
-            return;
-        }
-        temp->ricetta->ingredienti = (coda_ingredienti*)malloc(sizeof(coda_ingredienti));
-        if (temp->ricetta->ingredienti == NULL) {
-            free(temp->ricetta);
-            free(temp);
-            return;
-        }
-        strcpy(temp->ricetta->nome,ric->nome);
-        temp->ricetta->ingredienti=ric->ingredienti;
+        temp->ricetta = ric;
         temp->quantita = quantita;
         temp->tempo_richiesta = tempo;
         temp->next = NULL;
