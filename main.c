@@ -146,10 +146,6 @@ void singolo_ordine(int tempo, char* funz) {
             break;
         }
         ingredienteHashNode* nodo_ingrediente = magazzino[ingrediente_corrente->ingrediente->index_table];
-//        if (!nodo_ingrediente) {
-//            ingredienti_disponibili = 0;
-//            break;
-//        }
         rimuovi_ingredienti_scaduti(nodo_ingrediente, tempo);
         if (nodo_ingrediente->total_weight < quantita_richiesta) {
             ingredienti_disponibili = 0;
@@ -289,14 +285,28 @@ ricetta *crea_ricetta(char* nome_ricetta){
 }
 
 coda_ingredienti* inserisci_ingrediente(coda_ingredienti* head, char* nome, int peso){
+    char * nome1 = strdup(nome);
     coda_ingredienti* temp;
+    int i = 0;
     temp = crea_ingrediente();
-    temp->ingrediente->nome = strdup(nome);
-    if(temp->ingrediente->nome==NULL){
-        free(nome);
-        free(temp);
-        return head;
-    }
+        int index = hash_string(nome, TABLE_SIZE);
+        while(i<TABLE_SIZE) {
+            int try = (index + i) % TABLE_SIZE;
+            if (magazzino[try] == NULL) {
+                ingredienteHashNode *ingrediente_node = (ingredienteHashNode*)malloc(sizeof(ingredienteHashNode));
+                ingrediente_node->nome = nome1;
+                ingrediente_node->total_weight = 0;
+                ingrediente_node->head = (nodo_coda*)malloc(sizeof (nodo_coda));
+                ingrediente_node->index_table = try;
+                magazzino[try] = ingrediente_node;
+                temp->ingrediente = ingrediente_node;
+                break;
+            }else if(strcmp(nome1, magazzino[try]->nome)==0){
+                temp->ingrediente = magazzino[try];
+                break;
+            }
+            i++;
+        }
     temp->peso = peso;
     if(head != NULL){
         temp->next = head;
@@ -333,6 +343,8 @@ void elimina_ricetta(char *nome_ricetta) {
         if (ricette_hash_table[try] == DELETED_NODE) continue;
         if (strcmp(ricette_hash_table[try]->nome, nome) == 0) {
             if(ricette_hash_table[try]->in_sospeso == 0){
+                free(ricette_hash_table[try]->nome);
+                free(ricette_hash_table[try]->ingredienti);
                 ricette_hash_table[try] = DELETED_NODE;
                 printf("rimossa\n");
                 return;
