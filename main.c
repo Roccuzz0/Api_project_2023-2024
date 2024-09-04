@@ -461,6 +461,12 @@ void prepara_ordine(int curr_time) {
     if (head_ordini_in_sospeso == NULL) {
         return ;
     }
+    for(int i=0;i<TABLE_SIZE;i++){
+        if(magazzino[i]==NULL){
+            continue;
+        }
+        rimuovi_ingredienti_scaduti(magazzino[i],curr_time);
+    }
     coda_ordini_in_sospeso *curr = head_ordini_in_sospeso;
     coda_ordini_in_sospeso *prec = NULL;
     while (curr ) {
@@ -476,7 +482,6 @@ void prepara_ordine(int curr_time) {
                 ingredienti_disponibili = 0;
                 break;
             }
-            rimuovi_ingredienti_scaduti(nodo_ingrediente,curr_time);
             if (nodo_ingrediente->total_weight < quantita_richiesta) {
                 ingredienti_disponibili = 0;
                 break;
