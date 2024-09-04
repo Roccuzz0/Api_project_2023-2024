@@ -14,6 +14,7 @@ typedef struct nodo_coda {
 } nodo_coda;
 typedef struct ingredienteHashNode {
     char *nome;
+    int index_table;
     int total_weight;
     nodo_coda* head;
 } ingredienteHashNode;
@@ -140,11 +141,15 @@ void singolo_ordine(int tempo, char* funz) {
     coda_ingredienti* ingrediente_corrente = ric->ingredienti;
     while (ingrediente_corrente) {
         int quantita_richiesta = quantita * ingrediente_corrente->peso;
-        ingredienteHashNode* nodo_ingrediente = magazzino[hash_string(ingrediente_corrente->ingrediente->nome,TABLE_SIZE)];
-        if (!nodo_ingrediente) {
+        if(ingrediente_corrente->ingrediente->index_table == 0){
             ingredienti_disponibili = 0;
             break;
         }
+        ingredienteHashNode* nodo_ingrediente = magazzino[ingrediente_corrente->ingrediente->index_table];
+//        if (!nodo_ingrediente) {
+//            ingredienti_disponibili = 0;
+//            break;
+//        }
         rimuovi_ingredienti_scaduti(nodo_ingrediente, tempo);
         if (nodo_ingrediente->total_weight < quantita_richiesta) {
             ingredienti_disponibili = 0;
@@ -156,7 +161,7 @@ void singolo_ordine(int tempo, char* funz) {
         ingrediente_corrente = ric->ingredienti;
         while (ingrediente_corrente) {
             int quantita_richiesta = quantita * ingrediente_corrente->peso;
-            ingredienteHashNode* nodo_ingrediente = magazzino[hash_string(ingrediente_corrente->ingrediente->nome,TABLE_SIZE)];
+            ingredienteHashNode* nodo_ingrediente = magazzino[ingrediente_corrente->ingrediente->index_table];
             rimuovi_ingredienti_per_ordine(nodo_ingrediente,quantita_richiesta);
             ingrediente_corrente = ingrediente_corrente->next;
         }
@@ -369,6 +374,7 @@ void rifornimento(char* string, int tempo) {
                     free(ingrediente_node);
                     return;
                 }
+                ingrediente_node->index_table = try;
                 magazzino[try] = ingrediente_node;
                 trovato = 1;
                 break;
@@ -477,11 +483,15 @@ void prepara_ordine(int curr_time) {
         while (ingrediente_corrente != NULL) {
             int peso = ingrediente_corrente->peso;
             int quantita_richiesta = quantita * peso;
-            ingredienteHashNode *nodo_ingrediente = magazzino[hash_string(ingrediente_corrente->ingrediente->nome,TABLE_SIZE)];
-            if (nodo_ingrediente == NULL) {
+            if(ingrediente_corrente->ingrediente->index_table == 0){
                 ingredienti_disponibili = 0;
                 break;
             }
+            ingredienteHashNode *nodo_ingrediente = magazzino[ingrediente_corrente->ingrediente->index_table];
+//            if (nodo_ingrediente == NULL) {
+//                ingredienti_disponibili = 0;
+//                break;
+//            }
             if (nodo_ingrediente->total_weight < quantita_richiesta) {
                 ingredienti_disponibili = 0;
                 break;
@@ -493,7 +503,7 @@ void prepara_ordine(int curr_time) {
             ingrediente_corrente = curr->ricetta->ingredienti;
             while (ingrediente_corrente != NULL) {
                 int quantita_richiesta = quantita * ingrediente_corrente->peso;
-                ingredienteHashNode *nodo_ingrediente = magazzino[hash_string(ingrediente_corrente->ingrediente->nome,TABLE_SIZE)];
+                ingredienteHashNode *nodo_ingrediente = magazzino[ingrediente_corrente->ingrediente->index_table];
                 rimuovi_ingredienti_per_ordine(nodo_ingrediente,quantita_richiesta);
                 peso_totale += quantita * ingrediente_corrente->peso;
                 ingrediente_corrente = ingrediente_corrente->next;
