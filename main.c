@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define NAME 20
 #define TABLE_SIZE 1003
@@ -43,9 +44,7 @@ typedef struct coda_ordini_in_sospeso{
     struct coda_ordini_in_sospeso* next;
 }coda_ordini_in_sospeso;
 
-//ricetta* ricette_hash_table[RICETTE_SIZE] = {NULL};
-ricetta** ricette_hash_table;
-
+ricetta* ricette_hash_table[RICETTE_SIZE] = {NULL};
 ingredienteHashNode* magazzino[TABLE_SIZE] = {NULL};
 coda_ordini_completi* head_ordini_completi = NULL;
 coda_ordini_completi* tail_ordini_completi = NULL;
@@ -74,9 +73,6 @@ void stampa_ordini(coda_ordini_completi * head);
 
 
 int main(){
-    ricette_hash_table = (ricetta**) calloc(RICETTE_SIZE, sizeof(ricetta*));
-
-
     int t = 0;
     int tempo_carretto,peso_carretto;
     if (scanf("%d %d\n", &tempo_carretto, &peso_carretto) != 2) {
@@ -125,36 +121,36 @@ void singolo_ordine(int tempo, char* funz) {
     char* nome = strtok(funz, " ");
     int quantita = atoi(strtok(NULL, " "));
     int index = hash_string(nome, RICETTE_SIZE);
-    int ricetta_trovata = 0;
+    bool ricetta_trovata = false;
     ricetta* ric = NULL;
     for (int i = 0; i < RICETTE_SIZE; i++) {
         int try = (i + index) % RICETTE_SIZE;
         if (ricette_hash_table[try] != NULL && ricette_hash_table[try] != DELETED_NODE) {
             if (strcmp(ricette_hash_table[try]->nome, nome) == 0) {
-                ricetta_trovata = 1;
+                ricetta_trovata = true;
                 ric = ricette_hash_table[try];
                 ricette_hash_table[try]->in_sospeso ++;
                 break;
             }
         }
     }
-    if (ricetta_trovata == 0) {
+    if (!ricetta_trovata) {
         printf("rifiutato\n");
         return;
     }
     printf("accettato\n");
-    int ingredienti_disponibili = 1;
+    bool ingredienti_disponibili = true;
     coda_ingredienti* ingrediente_corrente = ric->ingredienti;
     while (ingrediente_corrente) {
         int quantita_richiesta = quantita * ingrediente_corrente->peso;
         if(ingrediente_corrente->ingrediente->index_table == 0){
-            ingredienti_disponibili = 0;
+            ingredienti_disponibili = false;
             break;
         }
         ingredienteHashNode* nodo_ingrediente = magazzino[ingrediente_corrente->ingrediente->index_table];
         rimuovi_ingredienti_scaduti(nodo_ingrediente, tempo);
         if (nodo_ingrediente->total_weight < quantita_richiesta) {
-            ingredienti_disponibili = 0;
+            ingredienti_disponibili = false;
             break;
         }
         ingrediente_corrente = ingrediente_corrente->next;
@@ -180,7 +176,19 @@ void singolo_ordine(int tempo, char* funz) {
         if (temp == NULL) {
             return;
         }
-        temp->ricetta = ric;
+        temp->ricetta = (ricetta*)malloc(sizeof(ricetta));
+        if (temp->ricetta == NULL) {
+            free(temp);
+            return;
+        }
+        temp->ricetta->ingredienti = (coda_ingredienti*)malloc(sizeof(coda_ingredienti));
+        if (temp->ricetta->ingredienti == NULL) {
+            free(temp->ricetta);
+            free(temp);
+            return;
+        }
+        strcpy(temp->ricetta->nome,ric->nome);
+        temp->ricetta->ingredienti=ric->ingredienti;
         temp->quantita = quantita;
         temp->tempo_richiesta = tempo;
         temp->next = NULL;
@@ -278,24 +286,24 @@ coda_ingredienti* inserisci_ingrediente(coda_ingredienti* head, char nome[NAME],
     coda_ingredienti* temp;
     int i = 0;
     temp = crea_ingrediente();
-        int index = hash_string(nome, TABLE_SIZE);
-        while(i<TABLE_SIZE) {
-            int try = (index + i) % TABLE_SIZE;
-            if (magazzino[try] == NULL) {
-                ingredienteHashNode *ingrediente_node = (ingredienteHashNode*)malloc(sizeof(ingredienteHashNode));
-                strcpy(ingrediente_node->nome,nome);
-                ingrediente_node->total_weight = 0;
-                ingrediente_node->head = (nodo_coda*)malloc(sizeof (nodo_coda));
-                ingrediente_node->index_table = try;
-                magazzino[try] = ingrediente_node;
-                temp->ingrediente = ingrediente_node;
-                break;
-            }else if(strcmp(nome, magazzino[try]->nome)==0){
-                temp->ingrediente = magazzino[try];
-                break;
-            }
-            i++;
+    int index = hash_string(nome, TABLE_SIZE);
+    while(i<TABLE_SIZE) {
+        int try = (index + i) % TABLE_SIZE;
+        if (magazzino[try] == NULL) {
+            ingredienteHashNode *ingrediente_node = (ingredienteHashNode*)malloc(sizeof(ingredienteHashNode));
+            strcpy(ingrediente_node->nome,nome);
+            ingrediente_node->total_weight = 0;
+            ingrediente_node->head = (nodo_coda*)malloc(sizeof (nodo_coda));
+            ingrediente_node->index_table = try;
+            magazzino[try] = ingrediente_node;
+            temp->ingrediente = ingrediente_node;
+            break;
+        }else if(strcmp(nome, magazzino[try]->nome)==0){
+            temp->ingrediente = magazzino[try];
+            break;
         }
+        i++;
+    }
     temp->peso = peso;
     if(head != NULL){
         temp->next = head;
@@ -356,7 +364,7 @@ void rifornimento(char* string, int tempo) {
         }
         int index = hash_string(ingrediente, TABLE_SIZE);
         ingredienteHashNode* ingrediente_node = NULL;
-        int trovato = 0;
+        int trovato = false;
         for (int i = 0; i < TABLE_SIZE; i++) {
             int try = (index + i) % TABLE_SIZE;
             if (magazzino[try] == NULL) {
@@ -366,18 +374,14 @@ void rifornimento(char* string, int tempo) {
                 }
                 strcpy(ingrediente_node->nome,ingrediente);
                 ingrediente_node->total_weight = 0;
-                ingrediente_node->head = (nodo_coda*)malloc(sizeof (nodo_coda));
-                if(!ingrediente_node->head){
-                    free(ingrediente_node);
-                    return;
-                }
+                ingrediente_node->head = NULL;
                 ingrediente_node->index_table = try;
                 magazzino[try] = ingrediente_node;
-                trovato = 1;
+                trovato = true;
                 break;
             } else if (strcmp(magazzino[try]->nome, ingrediente) == 0) {
                 ingrediente_node = magazzino[try];
-                trovato = 1;
+                trovato = true;
                 break;
             }
         }
@@ -475,22 +479,19 @@ void prepara_ordine(int curr_time) {
     while (curr ) {
         int quantita = curr->quantita;
         int tempo_richiesta = curr->tempo_richiesta;
-        int ingredienti_disponibili = 1;
+        bool ingredienti_disponibili = true;
         coda_ingredienti *ingrediente_corrente = curr->ricetta->ingredienti;
         while (ingrediente_corrente != NULL) {
             int peso = ingrediente_corrente->peso;
             int quantita_richiesta = quantita * peso;
             if(ingrediente_corrente->ingrediente->index_table == 0){
-                ingredienti_disponibili = 0;
+                ingredienti_disponibili = false;
                 break;
             }
             ingredienteHashNode *nodo_ingrediente = magazzino[ingrediente_corrente->ingrediente->index_table];
-//            if (nodo_ingrediente == NULL) {
-//                ingredienti_disponibili = 0;
-//                break;
-//            }
+
             if (nodo_ingrediente->total_weight < quantita_richiesta) {
-                ingredienti_disponibili = 0;
+                ingredienti_disponibili = false;
                 break;
             }
             ingrediente_corrente = ingrediente_corrente->next;
