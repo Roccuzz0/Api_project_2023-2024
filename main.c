@@ -5,7 +5,7 @@
 
 #define NAME 20
 #define TABLE_SIZE 1003
-#define RICETTE_SIZE 24893
+#define RICETTE_SIZE 24743
 #define DELETED_NODE (ricetta*)(0xFFFFFFFFFFFFFFUL)
 char buff[2983];
 
@@ -56,7 +56,7 @@ void rimuovi_ingredienti_scaduti(ingredienteHashNode* nodo, int tempo_corrente);
 void inserisci_in_coda_ingredienti(ingredienteHashNode* nodo, int scadenza_ingrediente, int peso_ingrediente);
 unsigned long hash_string(char *str,int dimensione);
 void singolo_ordine(int t,char* funz);
-ricetta* cerca_ricetta(char *nome_ricetta);
+ricetta* cerca_ricetta(char nome_ricetta[NAME]);
 void aggiungi_ricetta(char* funz);
 ricetta *crea_ricetta(char nome_ricetta[NAME]);
 coda_ingredienti* inserisci_ingrediente(coda_ingredienti * head, char nome[NAME], int peso);
@@ -64,7 +64,7 @@ coda_ingredienti * crea_ingrediente();
 void elimina_ricetta(char nome[NAME]);
 void rifornimento(char* string,int tempo);
 void trim_trailing_whitespace(char* str);
-void inserisci_ordine_in_sospeso(coda_ordini_in_sospeso *temp);
+void inserisci_ordine_in_sospeso(ricetta* ric, int quantita, int tempo);
 void prepara_ordine(int curr_time);
 void inserisci_ordine_completo( char nome[NAME], int quantita, int tempo, int peso);
 void spedisci_ordini( int peso);
@@ -172,27 +172,7 @@ void singolo_ordine(int tempo, char* funz) {
         inserisci_ordine_completo(nome, quantita, tempo, peso_totale);
         return;
     } else {
-        coda_ordini_in_sospeso* temp = (coda_ordini_in_sospeso*)malloc(sizeof(coda_ordini_in_sospeso));
-        if (temp == NULL) {
-            return;
-        }
-        temp->ricetta = (ricetta*)malloc(sizeof(ricetta));
-        if (temp->ricetta == NULL) {
-            free(temp);
-            return;
-        }
-        temp->ricetta->ingredienti = (coda_ingredienti*)malloc(sizeof(coda_ingredienti));
-        if (temp->ricetta->ingredienti == NULL) {
-            free(temp->ricetta);
-            free(temp);
-            return;
-        }
-        strcpy(temp->ricetta->nome,ric->nome);
-        temp->ricetta->ingredienti=ric->ingredienti;
-        temp->quantita = quantita;
-        temp->tempo_richiesta = tempo;
-        temp->next = NULL;
-        inserisci_ordine_in_sospeso(temp);
+        inserisci_ordine_in_sospeso(ric,quantita, tempo);
     }
 }
 
@@ -233,7 +213,7 @@ void aggiungi_ricetta(char* funz) {
     }
 }
 
-ricetta *cerca_ricetta(char *nome_ricetta){
+ricetta *cerca_ricetta(char nome_ricetta[NAME]){
     int index = hash_string(nome_ricetta,RICETTE_SIZE);
     for (int i = 0; i < RICETTE_SIZE; i++) {
         int try = (i + index) % RICETTE_SIZE;
@@ -248,7 +228,7 @@ ricetta *cerca_ricetta(char *nome_ricetta){
     return NULL;
 }
 
-ricetta *crea_ricetta(char* nome_ricetta){
+ricetta *crea_ricetta(char nome_ricetta[NAME]){
     ricetta *nuova_ricetta = (ricetta*)malloc(sizeof(ricetta));
     if(nuova_ricetta == NULL){
         return NULL;
@@ -261,7 +241,8 @@ ricetta *crea_ricetta(char* nome_ricetta){
         free(nuova_ricetta);
         return NULL;
     }
-    char* nome_ingrediente = token;
+    char nome_ingrediente[NAME];
+    strcpy(nome_ingrediente,token);
     token = strtok(NULL, " ");
     if (token == NULL) {
         free(nuova_ricetta->nome);
@@ -272,7 +253,7 @@ ricetta *crea_ricetta(char* nome_ricetta){
     head = inserisci_ingrediente(head, nome_ingrediente, peso);
     token = strtok(NULL, " ");
     while(token ){
-        nome_ingrediente = token;
+        strcpy(nome_ingrediente,token);
         token = strtok(NULL, " ");
         peso = atoi(token);
         head = inserisci_ingrediente(head, nome_ingrediente, peso);
@@ -327,7 +308,7 @@ coda_ingredienti * crea_ingrediente(){
     return temp;
 }
 
-void elimina_ricetta(char *nome_ricetta) {
+void elimina_ricetta(char nome_ricetta[NAME]) {
     char* nome = strtok(nome_ricetta," ");
     trim_trailing_whitespace(nome_ricetta);
     int index = hash_string(nome,RICETTE_SIZE);
@@ -454,7 +435,15 @@ void rimuovi_ingredienti_scaduti(ingredienteHashNode* nodo, int tempo_corrente) 
     }
 }
 
-void inserisci_ordine_in_sospeso(coda_ordini_in_sospeso * temp) {
+void inserisci_ordine_in_sospeso(ricetta * ric,int quantita, int tempo) {
+    coda_ordini_in_sospeso * temp = (coda_ordini_in_sospeso*)malloc(sizeof (coda_ordini_in_sospeso));
+    temp->ricetta=(ricetta*)malloc(sizeof (ricetta ));
+    temp->ricetta->ingredienti = (coda_ingredienti *) malloc(sizeof (coda_ingredienti ));
+    strcpy(temp->ricetta->nome,ric->nome);
+    temp->ricetta->ingredienti = ric->ingredienti;
+    temp->quantita = quantita;
+    temp->tempo_richiesta = tempo;
+    temp->next = NULL;
     if (tail_ordini_in_sospeso == NULL) {
         head_ordini_in_sospeso = temp;
         tail_ordini_in_sospeso = temp;
@@ -604,15 +593,13 @@ coda_ordini_completi* ordina_per_peso(coda_ordini_completi* head) {
         coda_ordini_completi* current = head;
         head = head->next;
         if (sorted == NULL ||
-            (sorted->peso_totale < current->peso_totale) ||
-            (sorted->peso_totale == current->peso_totale && sorted->tempo_richiesta > current->tempo_richiesta)) {
+            (sorted->peso_totale < current->peso_totale) || (sorted->peso_totale == current->peso_totale && sorted->tempo_richiesta > current->tempo_richiesta)) {
             current->next = sorted;
             sorted = current;
         } else {
             coda_ordini_completi* temp = sorted;
             while (temp->next != NULL &&
-                   (temp->next->peso_totale > current->peso_totale ||
-                    (temp->next->peso_totale == current->peso_totale && temp->next->tempo_richiesta <= current->tempo_richiesta))) {
+                   (temp->next->peso_totale > current->peso_totale || (temp->next->peso_totale == current->peso_totale && temp->next->tempo_richiesta <= current->tempo_richiesta))) {
                 temp = temp->next;
             }
             current->next = temp->next;
